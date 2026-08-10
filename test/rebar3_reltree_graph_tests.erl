@@ -22,7 +22,7 @@ transitive_local_closure_and_external_declaration_test() ->
         {ok, Model} = rebar3_reltree_project:enrich(Graph, #{}, Request),
         Report = report_bytes(Model),
         ?assert(string:str(Report, "external") > 0),
-        ?assert(string:str(Report, "pending-task-3") > 0),
+        ?assert(string:str(Report, "revision_state: not-applicable") > 0),
         ?assert(string:str(Report, "status: up-to-date") > 0)
     after
         rebar3_reltree_fixtures:cleanup(Workspace)
@@ -93,7 +93,7 @@ checkout_only_and_external_declarations_do_not_create_edges_test() ->
         {ok, Report} = rebar3_reltree_report:render(Model),
         Text = binary_to_list(Report),
         ?assert(string:str(Text, "external") > 0),
-        ?assert(string:str(Text, "pending-task-3") > 0)
+        ?assert(string:str(Text, "revision_state: not-applicable") > 0)
     after
         rebar3_reltree_fixtures:cleanup(Workspace)
     end.

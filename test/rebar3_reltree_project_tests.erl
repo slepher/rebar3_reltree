@@ -18,12 +18,12 @@ complete_local_report_contains_required_facts_test() ->
         {ok, Result} = rebar3_reltree_project:generate(
                          Request, #{clock => fixed_clock()}),
         Text = binary_to_list(maps:get(bytes, Result)),
-        ?assert(string:str(Text, "format_version: 1") > 0),
+        ?assert(string:str(Text, "format_version: 2") > 0),
         ?assert(string:str(Text, "current_project_path: ") > 0),
         ?assert(string:str(Text, "app_src: ") > 0),
         ?assert(string:str(Text, "project_plugins") > 0),
         ?assert(string:str(Text, "plugins") > 0),
-        ?assert(string:str(Text, "revision_state: pending-task-3") > 0),
+        ?assert(string:str(Text, "revision_state: not-applicable") > 0),
         ?assert(string:str(Text, "network_sync_at: not-performed") > 0),
         ?assert(string:str(Text, "status: up-to-date") > 0)
     after

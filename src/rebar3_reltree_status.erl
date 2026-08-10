@@ -7,12 +7,14 @@ values() ->
     [insufficient_local_data, update_required, up_to_date].
 
 -spec evaluate(map()) -> {atom(), [atom()]}.
-evaluate(#{nodes := Nodes, graph_issues := GraphIssues}) ->
+evaluate(#{nodes := Nodes, graph_issues := GraphIssues} = Input) ->
     GraphReasons = [Reason || {_Path, Reason} <- GraphIssues],
+    RevisionReasons = maps:get(revision_reasons, Input, []),
     NodeResults = [node_result(Node) || Node <- Nodes],
     NodeStatuses = [Status || {Status, _Reasons} <- NodeResults],
     NodeReasons = lists:append([Reasons || {_Status, Reasons} <- NodeResults]),
-    Status = case lists:member(insufficient_local_data,
+    Status = case RevisionReasons =/= [] orelse
+                   lists:member(insufficient_local_data,
                                [status_from_graph(GraphReasons) | NodeStatuses]) of
                  true -> insufficient_local_data;
                  false ->
@@ -21,7 +23,7 @@ evaluate(#{nodes := Nodes, graph_issues := GraphIssues}) ->
                          false -> up_to_date
                      end
              end,
-    Reasons = lists:usort(GraphReasons ++ NodeReasons),
+    Reasons = lists:usort(GraphReasons ++ NodeReasons ++ RevisionReasons),
     {Status, Reasons}.
 
 node_result(Node) ->

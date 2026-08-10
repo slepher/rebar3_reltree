@@ -7,8 +7,8 @@ render(Model) ->
     render(Model, #{}).
 
 -spec render(map(), map()) -> {ok, binary()} | {error, term()}.
-render(Model, Options) when is_map(Model), is_map(Options) ->
-    case local_sync_at(Options) of
+render(Model, _Options) when is_map(Model) ->
+    case model_local_sync_at(Model) of
         {ok, LocalSyncAt} ->
             try
                 encode_utf8([
@@ -19,7 +19,9 @@ render(Model, Options) when is_map(Model), is_map(Options) ->
                     "\n",
                     "- status: ", display(maps:get(status, Model)), "\n",
                     "- local_sync_at: ", escape(LocalSyncAt), "\n",
-                    "- network_sync_at: not-performed\n",
+                    "- network_sync_at: ",
+                    display(maps:get(network_sync_at, Model, not_performed)),
+                    "\n",
                     "- current_project_path: ",
                     value(maps:get(current, Model)), "\n",
                     "- current_project_name: ",
@@ -53,20 +55,16 @@ encode_utf8(Document) ->
                      {incomplete_unicode, Valid, Incomplete}}}
     end.
 
-local_sync_at(Options) ->
-    Clock = maps:get(clock, Options, fun calendar:universal_time/0),
-    try
-        Value = case Clock of
-                    Fun when is_function(Fun, 0) -> Fun();
-                    Other -> Other
-                end,
-        case Value of
-            Text when is_binary(Text) -> {ok, Text};
-            Text when is_list(Text) -> {ok, Text};
-            Calendar -> {ok, format_time(Calendar)}
-        end
-    catch
-        Class:Reason -> {error, {clock, Class, Reason}}
+model_local_sync_at(Model) ->
+    case maps:find(local_sync_at, Model) of
+        {ok, Value} when is_binary(Value); is_list(Value) ->
+            case rebar3_reltree_clock:valid(Value) of
+                true when is_binary(Value) -> {ok, binary_to_list(Value)};
+                true -> {ok, Value};
+                false -> {error, {clock, invalid_clock}}
+            end;
+        {ok, _Other} -> {error, {clock, invalid_clock}};
+        error -> {error, {clock, missing_local_sync_at}}
     end.
 
 warnings_section([]) ->
@@ -106,9 +104,7 @@ node_section(Node, Edges) ->
      relation_section("downstream_edges", downstream_edges(Path, Edges),
                       downstream),
      "- local-only caveats:\n",
-     indent_bullets([network_sync_not_performed,
-                     external_revisions_pending_task_3,
-                     readme_mutation_not_performed]),
+     indent_bullets(maps:get(local_only_caveats, Node, [])),
      "\n"].
 
 version_lines(Version) ->
@@ -129,16 +125,22 @@ tag_lines(Tags) ->
       value(maps:get(version, Tag)), "\n"] || Tag <- Tags].
 
 declarations_section(Node, Edges) ->
+    Rows = case maps:find(revision_declarations, Node) of
+               {ok, Facts} -> [revision_row(Fact) || Fact <- Facts];
+               error -> legacy_declaration_rows(Node, Edges)
+           end,
+    ["- runtime_declarations:\n", none_or(Rows, "  - none\n"), "\n"].
+
+legacy_declaration_rows(Node, Edges) ->
     Declarations = lists:sort(fun declaration_less/2,
-                               maps:get(dependencies, Node, [])),
+                              maps:get(dependencies, Node, [])),
     LocalNames = [maps:get(dependency, Edge) || Edge <- Edges,
                   maps:get(source, Edge) =:= maps:get(path, Node)],
     Relationships = maps:get(dependency_relationships, Node, #{}),
-    Rows = [declaration_row(Declaration,
-                            relationship_for(declaration_name(Declaration),
-                                             Relationships, LocalNames)) ||
-            Declaration <- Declarations],
-    ["- runtime_declarations:\n", none_or(Rows, "  - none\n"), "\n"].
+    [declaration_row(Declaration,
+                     relationship_for(declaration_name(Declaration),
+                                      Relationships, LocalNames)) ||
+     Declaration <- Declarations].
 
 relationship_for(Name, Relationships, _LocalNames)
   when is_map_key(Name, Relationships) ->
@@ -158,11 +160,39 @@ declaration_row(Declaration, omitted_local_checkout) ->
      "; declaration: ", term_value(Declaration),
      "; relationship: omitted-local-checkout\n"];
 declaration_row(Declaration, _External) ->
-    external_row(declaration_name(Declaration), Declaration).
+    legacy_external_row(declaration_name(Declaration), Declaration).
 
-external_row(Name, Declaration) ->
+legacy_external_row(Name, Declaration) ->
     ["  - name: ", value(Name), "; declaration: ", term_value(Declaration),
-     "; relationship: external; revision_state: pending-task-3\n"].
+     "; relationship: external; revision_state: not-applicable\n",
+     "    source_url: none\n",
+     "    selector_kind: none\n",
+     "    selector_value: none\n",
+     "    resolved_revision: none\n",
+     "    revision_observed_at: not-performed\n",
+     "    network_sync_at: not-performed\n"].
+
+revision_row(Fact) ->
+    Relationship = relationship_text(maps:get(relationship, Fact, external)),
+    ["  - name: ", value(maps:get(name, Fact)),
+     "; declaration: ", term_value(maps:get(declaration, Fact)),
+     "; relationship: ", Relationship,
+     "; revision_state: ",
+     display(maps:get(revision_state, Fact, not_applicable)), "\n",
+     "    source_url: ", value(maps:get(source_url, Fact, none)), "\n",
+     "    selector_kind: ", value(maps:get(selector_kind, Fact, none)), "\n",
+     "    selector_value: ", value(maps:get(selector_value, Fact, none)), "\n",
+     "    resolved_revision: ",
+     value(maps:get(resolved_revision, Fact, none)), "\n",
+     "    revision_observed_at: ",
+     display(maps:get(revision_observed_at, Fact, not_performed)), "\n",
+     "    network_sync_at: ",
+     display(maps:get(network_sync_at, Fact, not_performed)), "\n"].
+
+relationship_text(local_checkout) -> "local-checkout";
+relationship_text(omitted_local_checkout) -> "omitted-local-checkout";
+relationship_text(external) -> "external";
+relationship_text(Other) -> display(Other).
 
 declaration_name(Declaration) ->
     {ok, Name} = rebar3_reltree_config:dependency_name(Declaration),
@@ -268,7 +298,7 @@ sort_warnings(Warnings) ->
 
 -spec format_time(term()) -> string().
 format_time({{Year, Month, Day}, {Hour, Minute, Second}}) ->
-    lists:flatten(io_lib:format("~4..0B-~2..0B-~2..0BT~2..0B:~2..0B:~2..0BZ",
-                                [Year, Month, Day, Hour, Minute, Second]));
+    rebar3_reltree_clock:format({{Year, Month, Day},
+                                 {Hour, Minute, Second}});
 format_time(Other) ->
     lists:flatten(io_lib:format("~tp", [Other])).

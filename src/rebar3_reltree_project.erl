@@ -37,7 +37,7 @@ generate(Request, Options) when is_map(Request), is_map(Options) ->
     end.
 
 -spec enrich(map(), map(), map()) -> {ok, map()} | {error, term()}.
-enrich(Graph, _Options, Request) ->
+enrich(Graph, Options, Request) ->
     Current = maps:get(current, Graph),
     Included = maps:get(included, Graph),
     Entries = maps:get(entries, Graph),
@@ -56,25 +56,36 @@ enrich(Graph, _Options, Request) ->
             GraphIssues = lists:usort(GraphIssues0 ++
                                       [{Path, omitted_candidate} ||
                                        Path <- Omitted]),
-            StatusInput = #{nodes => Nodes, graph_issues => GraphIssues},
-            {Status, StatusReasons} = rebar3_reltree_status:evaluate(
-                                        StatusInput),
-            Model = #{format_version => 1,
+            BaseModel = #{format_version => 2,
                       current => Current,
                       current_name => filename:basename(Current),
-                      status => Status,
-                      status_reasons => StatusReasons,
                       nodes => Nodes,
                       edges => Edges,
                       warnings => sort_warnings(
                                     maps:get(warnings, Graph) ++ Warnings ++
                                     UnincludedWarnings),
-                      local_only_caveats => [
-                          network_sync_not_performed,
-                          external_revisions_pending_task_3,
-                          readme_mutation_not_performed],
+                      graph_issues => GraphIssues,
                       request => Request},
-            {ok, Model}
+            case rebar3_reltree_rev:enrich(
+                   BaseModel, Edges, maps:get(rev, Request, auto),
+                   maps:get(output_path, Request), Options) of
+                {error, _} = Error ->
+                    Error;
+                {ok, RevisionModel} ->
+                    StatusInput = #{nodes => maps:get(nodes, RevisionModel),
+                                    graph_issues => GraphIssues,
+                                    revision_reasons => maps:get(
+                                      revision_reasons, RevisionModel, [])},
+                    {Status, StatusReasons} =
+                        rebar3_reltree_status:evaluate(StatusInput),
+                    case rebar3_reltree_clock:now(Options) of
+                        {error, Reason} -> {error, Reason};
+                        {ok, LocalSyncAt} ->
+                            {ok, RevisionModel#{status => Status,
+                                                status_reasons => StatusReasons,
+                                                local_sync_at => LocalSyncAt}}
+                    end
+            end
     end.
 
 enrich_unincluded(Graph, Included) ->
