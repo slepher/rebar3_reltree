@@ -20,7 +20,7 @@ do(State) ->
         {ok, Request} ->
             case rebar3_reltree:dispatch_tree(Request) of
                 {error, Reason} -> provider_error(Reason);
-                Other -> Other
+                {ok, _Result} -> {ok, State}
             end;
         {help, Kind} ->
             io:put_chars(rebar3_reltree_cli:help(Kind)),

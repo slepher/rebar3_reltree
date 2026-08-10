@@ -15,9 +15,9 @@ init(State) ->
     ]),
     {ok, rebar_state:add_provider(State, Provider)}.
 
--spec dispatch_tree(map()) -> {error, tree_engine_unavailable}.
-dispatch_tree(_Request) ->
-    {error, tree_engine_unavailable}.
+-spec dispatch_tree(map()) -> {ok, map()} | {error, term()}.
+dispatch_tree(Request) when is_map(Request) ->
+    rebar3_reltree_project:generate(Request).
 
 -spec main([string()]) -> no_return().
 main(Args) ->

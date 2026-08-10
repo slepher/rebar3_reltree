@@ -87,8 +87,6 @@ parse_cli_root(Path) ->
     {error, {invalid_option, scan_roots, Path}}.
 
 -spec format_error(term()) -> iolist().
-format_error(tree_engine_unavailable) ->
-    "tree_engine_unavailable";
 format_error({invalid_command, Command}) ->
     io_lib:format("unknown command ~p; use 'tree'", [Command]);
 format_error({invalid_option, Option, Value}) ->

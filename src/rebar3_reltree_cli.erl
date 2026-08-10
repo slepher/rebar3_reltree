@@ -38,12 +38,10 @@ run(Args, Context0) when is_list(Args), is_map(Context0) ->
                            Context#{config_options => ConfigOptions}) of
                         {ok, Request} ->
                             case rebar3_reltree:dispatch_tree(Request) of
-                                {error, tree_engine_unavailable} ->
-                                    {1, "tree_engine_unavailable\n"};
                                 {error, Reason} ->
                                     {1, error_output(Reason)};
-                                _ ->
-                                    {1, "tree_engine_unavailable\n"}
+                                {ok, _Result} ->
+                                    {0, []}
                             end;
                         {error, Reason} ->
                             {2, error_output(Reason)}

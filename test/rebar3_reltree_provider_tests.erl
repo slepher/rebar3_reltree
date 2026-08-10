@@ -12,10 +12,7 @@ provider_registration_test() ->
 provider_metadata_test() ->
     Spec = rebar3_reltree_prv_tree:option_spec(),
     ?assertMatch([{scan_roots, _, "scan-roots", string, _},
-                  {rev, _, "rev", string, _}], Spec),
-    ?assertEqual("tree_engine_unavailable",
-                 lists:flatten(rebar3_reltree_prv_tree:format_error(
-                                  tree_engine_unavailable))).
+                  {rev, _, "rev", string, _}], Spec).
 
 provider_default_context_test() ->
     Root = unique_root(),
@@ -56,12 +53,13 @@ provider_uses_effective_last_config_value_test() ->
     ?assertEqual([], maps:get(scan_roots, Request)),
     ?assertEqual(true, maps:get(rev, Request)).
 
-provider_returns_unavailable_error_test() ->
+provider_returns_current_failure_test() ->
     Root = unique_root(),
     State0 = rebar_state:new([]),
     State1 = rebar_state:dir(State0, Root),
     State2 = rebar_state:command_args(State1, []),
-    ?assertEqual({error, {rebar3_reltree_prv_tree, tree_engine_unavailable}},
+    ?assertMatch({error, {rebar3_reltree_prv_tree,
+                         {current_project, _, _}}},
                  rebar3_reltree_prv_tree:do(State2)),
     ?assertNot(filelib:is_dir(filename:join([Root, "_build", "default",
                                              "reltree"]))).
@@ -77,6 +75,24 @@ provider_help_is_successful_test() ->
     State0 = rebar_state:new([]),
     State1 = rebar_state:command_args(State0, ["--help"]),
     ?assertMatch({ok, _}, rebar3_reltree_prv_tree:do(State1)).
+
+provider_dispatches_valid_project_and_writes_report_test() ->
+    Root = rebar3_reltree_fixtures:new_root(),
+    try
+        rebar3_reltree_fixtures:write_project(Root, provider_fixture, [],
+                                              "0.1.0"),
+        State0 = rebar_state:new([]),
+        State1 = rebar_state:dir(State0, Root),
+        State2 = rebar_state:command_args(State1, ["tree"]),
+        {ok, State2} = rebar3_reltree_prv_tree:do(State2),
+        Output = filename:join([Root, "_build", "default", "reltree",
+                                "project.md"]),
+        {ok, Bytes} = file:read_file(Output),
+        ?assert(string:str(binary_to_list(Bytes),
+                           "status: up-to-date") > 0)
+    after
+        rebar3_reltree_fixtures:cleanup(Root)
+    end.
 
 unique_root() ->
     filename:join("/tmp", "reltree-task1-provider-" ++
