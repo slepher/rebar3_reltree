@@ -1,0 +1,4 @@
+{application, rebar3_reltree,
+ [{description, "reltree Rebar3 plugin and escript"},
+  {vsn, "0.1.0"},
+  {applications, [kernel, stdlib]}]}.
