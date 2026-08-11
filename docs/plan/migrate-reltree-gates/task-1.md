@@ -118,14 +118,21 @@ same map shape and values:
   `<project_root>/_build/default/reltree/project.md`. There is no `--profile`.
 - The provider reads the already evaluated `reltree` configuration from
   Rebar3 state. The escript reads local `rebar.config` terms from cwd and
-  extracts the top-level `{reltree, Options}` entry. Missing configuration is
-  equivalent to an empty option list. Read/config failure is actionable and
+  selects the last top-level `{reltree, Options}` entry. Missing configuration
+  is equivalent to an empty option list. Read/config failure is actionable and
   occurs before tree dispatch.
-- Relevant config keys are `scan_roots` and `rev`. A duplicate relevant key,
-  duplicate top-level `reltree` entry, malformed relevant value, or malformed
-  option container is an error. Unrelated top-level Rebar3 configuration and
-  unknown keys inside the `reltree` option list are preserved for future
-  compatibility by being ignored in task-1; they do not alter the request.
+- Duplicate top-level `reltree` entries are ignored except for the last one:
+  this is Rebar3 last-value-wins behavior, not an error or blocker. The
+  provider must consume Rebar3's already selected evaluated value and must not
+  read or reconstruct raw `rebar.config` terms. The escript must select the
+  last top-level value itself so equivalent effective configuration normalizes
+  identically on both surfaces. Earlier top-level `reltree` values, including
+  their contents, do not participate in validation.
+- Relevant keys inside the selected option list are `scan_roots` and `rev`.
+  A duplicate relevant key within that selected list, malformed relevant
+  value, or malformed selected option container is an error. Unrelated
+  top-level Rebar3 configuration and unknown keys inside the selected
+  `reltree` option list are ignored in task-1; they do not alter the request.
 
 ### Scan-root parsing and precedence
 
@@ -138,6 +145,10 @@ same map shape and values:
 - A CLI root is `PATH` for shallow or `PATH:deep` for deep. Strip only one
   terminal `:deep`; an empty resulting path is invalid. Do not support the
   stale `--root` spelling.
+- A malformed or empty configured root path returns
+  `{invalid_config, scan_roots, Value}`. A malformed or empty CLI root path
+  returns `{invalid_option, scan_roots, Value}`. Root normalization must retain
+  origin long enough to preserve this distinction.
 - Resolve relative roots against `project_root` and lexically normalize them
   to absolute paths without accessing or creating the filesystem. Preserve
   first occurrence order. Exact duplicates with the same mode collapse to the
@@ -205,6 +216,10 @@ Tests must prove behavior, not merely module existence.
   `..` scan root, cwd project root, and the correct provider-active or escript
   default output context.
 - Configured plain/deep roots and `rev=false|true|auto` normalize correctly.
+- Two or more top-level `reltree` entries use only the last value in the
+  escript, matching the effective value supplied by Rebar3 to the provider;
+  earlier values do not trigger validation. Provider coverage proves this
+  without provider access to raw `rebar.config` terms.
 - Repeated CLI roots preserve order, collapse same-mode duplicates, replace
   config roots, and CLI rev overrides config.
 - Equivalent provider/escript inputs produce the same request except for the
@@ -215,9 +230,10 @@ Tests must prove behavior, not merely module existence.
 
 - Unknown command/option, extra positional argument, repeated `--rev`, invalid
   rev, empty root, `:deep`, malformed deep/config tuple, duplicate relevant
-  config key, duplicate top-level reltree config, unreadable/malformed config,
-  and contradictory root modes return the frozen validation class and no
-  report write.
+  config key within the selected option list, unreadable/malformed config, and
+  contradictory root modes return the frozen validation class and no report
+  write. An empty or malformed configured root is specifically
+  `invalid_config`; the equivalent CLI root failure is `invalid_option`.
 - Provider errors remain returned values and format with actionable context;
   expected CLI errors map to the frozen exit classes without an Erlang crash.
 
@@ -239,7 +255,9 @@ Tests must prove behavior, not merely module existence.
 1. Add minimal `.gitignore`, `rebar.config`, and application metadata for an
    OTP library/plugin plus `reltree` escript.
 2. Implement pure config/CLI root and rev validation, precedence, path
-   normalization, and shared request-map construction.
+   normalization, selected-config last-value-wins behavior, origin-specific
+   root errors, and shared request-map construction. Keep provider config
+   access on Rebar3's evaluated selected value; do not add raw-config access.
 3. Implement `rebar3_reltree` provider registration and temporary shared
    no-write tree dispatch.
 4. Implement the namespaced tree provider using current Rebar3 state/profile
@@ -247,7 +265,10 @@ Tests must prove behavior, not merely module existence.
 5. Implement escript command/help parsing and the thin non-halting/testable
    adapter plus final exit mapping.
 6. Add the three exact EUnit modules covering every frozen success, failure,
-   and boundary scenario.
+   and boundary scenario, including duplicate top-level last-value-wins on
+   both surfaces, provider operation without raw-config recovery, configured
+   empty/malformed root `invalid_config`, and CLI invalid root
+   `invalid_option` regressions.
 7. Run all Coding Self-Tests, inspect exact changed paths, and return the
    coding-worker-authored evidence packet without staging or committing.
 
@@ -273,7 +294,9 @@ every rework:
 
 The coding packet must identify the worker, every command and exit status,
 EUnit test count, acceptance outputs, report-path absence, exact changed paths,
-timeout/interruption state, and any temporary fixtures/artifacts cleaned.
+timeout/interruption state, and any temporary fixtures/artifacts cleaned. Its
+EUnit evidence must identify the focused last-value-wins and root-origin error
+regressions as executed; passing only the pre-revision test set is insufficient.
 
 ## Independent Verification — later separate `luna_runner`
 
@@ -295,7 +318,11 @@ The runner packet must identify the runner; report raw command output, exact
 exit status and EUnit count for each applicable command; explicitly recognize
 the expected exits `0,0,1,2` for steps 4-7 rather than treating expected
 nonzero exits as interruption; report report-path absence and exact status;
-and perform no source/test semantic audit or edit.
+and perform no source/test semantic audit or edit. Sol review separately
+inspects the implementation and focused assertions, and accepts only if both
+surfaces use the effective last top-level value without provider raw-config
+access and configured/CLI invalid roots retain `invalid_config`/
+`invalid_option` respectively.
 
 ## Expected diff and commit
 
@@ -315,7 +342,8 @@ and perform no source/test semantic audit or edit.
 - Provider metadata and escript help expose only the frozen tree command and
   options.
 - Provider and escript build the frozen normalized request with correct config
-  precedence and active/default profile behavior.
+  precedence, top-level last-value-wins behavior, origin-specific root error
+  classes, and active/default profile behavior.
 - Every invalid/help/unavailable path is structured, deterministic, and
   write-free; no report placeholder exists.
 - Coding-worker and independent-runner packets are separately complete and
@@ -330,8 +358,6 @@ Stop without widening scope or choosing new policy if:
   cannot provide its active build base/profile through a supported API;
 - one OTP application cannot be both plugin and escript without adding a
   production dependency or an unowned path;
-- Rebar3's evaluated config and standalone local config cannot normalize to
-  the frozen shared model without defining a new config-execution policy;
 - a required edit falls outside exact ownership, a pre-existing path has
   unexpected content, or another worker/user change overlaps an owned path;
 - any command attempts report generation, Git/network mutation, README change,

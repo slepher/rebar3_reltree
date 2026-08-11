@@ -25,45 +25,34 @@ run(Args, Context0) when is_list(Args), is_map(Context0) ->
         {error, Reason} ->
             {2, error_output(Reason)};
         {ok, Cli} ->
-            case config_for(Context0) of
-                {ok, ConfigOptions} ->
-                    Context = maps:merge(
-                        #{project_root => maps:get(cwd, Context0, "."),
-                          build_base_dir => filename:join(
-                            [maps:get(cwd, Context0, "."), "_build", "default"]),
-                          profile => default,
-                          cli_scan_roots => maps:get(cli_scan_roots, Cli),
-                          cli_rev => maps:get(cli_rev, Cli)}, Context0),
-                    case rebar3_reltree_request:normalize(
-                           Context#{config_options => ConfigOptions}) of
-                        {ok, Request} ->
-                            case rebar3_reltree:dispatch_tree(Request) of
-                                {error, Reason} ->
-                                    {1, error_output(Reason)};
-                                {ok, _Result} ->
-                                    {0, []}
-                            end;
-                        {error, Reason} ->
-                            {2, error_output(Reason)}
-                    end;
-                {error, Reason} ->
-                    {2, error_output(Reason)}
+            case maps:get(command, Cli, tree) of
+                bgate ->
+                    run_bgate(Cli, Context0);
+                tree ->
+                    run_tree(Cli, Context0)
             end
     end.
 
--spec help(top | tree) -> iolist().
+-spec help(top | tree | bgate) -> iolist().
 help(top) ->
     ["Usage: reltree <command> [options]\n\n",
-     "Commands:\n",
-     "  tree  inspect the local project tree\n\n",
-     "Run 'reltree tree --help' for tree options.\n"];
+    "Commands:\n",
+     "  tree   inspect the local project tree\n",
+     "  bgate  check or update local CI badges\n\n",
+     "Run 'reltree tree --help' or 'reltree bgate --help' for options.\n"];
 help(tree) ->
     ["Usage: reltree tree [options]\n\n",
      "Options:\n",
      "  --scan-roots PATH[:deep]  repeatable; replaces configured roots\n",
      "  --rev false|auto|true     revision lookup policy\n\n",
      "Defaults: scan root '..' shallow; rev auto.\n",
-     "Output: _build/<profile>/reltree/project.md\n"].
+     "Output: _build/<profile>/reltree/project.md\n"];
+
+help(bgate) ->
+    ["Usage: reltree bgate [options]\n\n",
+     "Options (exactly one required):\n",
+     "  --check  verify local README CI badges\n",
+     "  --write  update local README CI badges\n"].
 
 -spec load_config(string()) -> {ok, list()} | {error, term()}.
 load_config(Cwd) ->
@@ -92,3 +81,44 @@ config_for(Context) ->
 
 error_output(Reason) ->
     ["reltree: ", rebar3_reltree_request:format_error(Reason), "\n"].
+
+run_tree(Cli, Context0) ->
+    case config_for(Context0) of
+        {ok, ConfigOptions} ->
+            Context = maps:merge(
+                #{project_root => maps:get(cwd, Context0, "."),
+                  build_base_dir => filename:join(
+                    [maps:get(cwd, Context0, "."), "_build", "default"]),
+                  profile => default,
+                  cli_scan_roots => maps:get(cli_scan_roots, Cli),
+                  cli_rev => maps:get(cli_rev, Cli)}, Context0),
+            case rebar3_reltree_request:normalize(
+                   Context#{config_options => ConfigOptions}) of
+                {ok, Request} ->
+                    case rebar3_reltree:dispatch_tree(Request) of
+                        {error, Reason} ->
+                            {1, error_output(Reason)};
+                        {ok, _Result} ->
+                            {0, []}
+                    end;
+                {error, Reason} ->
+                    {2, error_output(Reason)}
+            end;
+        {error, Reason} ->
+            {2, error_output(Reason)}
+    end.
+
+run_bgate(Cli, Context0) ->
+    Cwd = maps:get(cwd, Context0, "."),
+    case rebar3_reltree_request:normalize_bgate(
+           #{cwd => Cwd, mode => maps:get(mode, Cli)}) of
+        {ok, Request} ->
+            case rebar3_reltree:dispatch_bgate(Request) of
+                {error, Reason} ->
+                    {1, error_output(Reason)};
+                {ok, Result} ->
+                    {0, rebar3_reltree_badge:format_result(Result)}
+            end;
+        {error, Reason} ->
+            {2, error_output(Reason)}
+    end.

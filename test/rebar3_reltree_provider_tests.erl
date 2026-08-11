@@ -7,12 +7,42 @@ provider_registration_test() ->
     Providers = rebar_state:providers(State),
     ?assert(contains_term(Providers, tree)),
     ?assert(contains_term(Providers, reltree)),
-    ?assert(contains_term(Providers, rebar3_reltree_prv_tree)).
+    ?assert(contains_term(Providers, rebar3_reltree_prv_tree)),
+    ?assert(contains_term(Providers, bgate)),
+    ?assert(contains_term(Providers, rebar3_reltree_prv_bgate)).
 
 provider_metadata_test() ->
     Spec = rebar3_reltree_prv_tree:option_spec(),
     ?assertMatch([{scan_roots, _, "scan-roots", string, _},
                   {rev, _, "rev", string, _}], Spec).
+
+provider_bgate_metadata_and_request_test() ->
+    ?assertMatch([{check, undefined, "check", boolean, _},
+                  {write, undefined, "write", boolean, _}],
+                 rebar3_reltree_prv_bgate:option_spec()),
+    Root = unique_root(),
+    State0 = rebar_state:new([]),
+    State1 = rebar_state:dir(State0, Root),
+    State2 = rebar_state:command_args(State1, ["bgate", "--check"]),
+    ?assertEqual({ok, #{command => bgate, mode => check,
+                        project_root => filename:absname(Root)}},
+                 rebar3_reltree_prv_bgate:request(State2)),
+    ?assertMatch({error, {rebar3_reltree_prv_bgate,
+                         {invalid_mode, missing}}},
+                 rebar3_reltree_prv_bgate:do(
+                   rebar_state:command_args(State1, ["bgate"]))).
+
+provider_no_workflow_is_successful_test() ->
+    Root = rebar3_reltree_fixtures:new_root(),
+    try
+        State0 = rebar_state:new([]),
+        State1 = rebar_state:dir(State0, Root),
+        State2 = rebar_state:command_args(State1, ["bgate", "--write"]),
+        ?assertMatch({ok, _}, rebar3_reltree_prv_bgate:do(State2)),
+        ?assertNot(filelib:is_regular(filename:join(Root, "project.md")))
+    after
+        rebar3_reltree_fixtures:cleanup(Root)
+    end.
 
 provider_default_context_test() ->
     Root = unique_root(),

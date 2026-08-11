@@ -7,6 +7,7 @@ top_help_test() ->
     {Exit, Output} = rebar3_reltree_cli:run(["--help"], context(Root)),
     ?assertEqual(0, Exit),
     ?assert(string:str(lists:flatten(Output), "tree") > 0),
+    ?assert(string:str(lists:flatten(Output), "bgate") > 0),
     ?assertNot(filelib:is_dir(output_dir(Root))).
 
 tree_help_test() ->
@@ -17,6 +18,27 @@ tree_help_test() ->
     ?assert(string:str(Text, "--scan-roots PATH[:deep]") > 0),
     ?assert(string:str(Text, "--rev false|auto|true") > 0),
     ?assertNot(filelib:is_dir(output_dir(Root))).
+
+bgate_help_and_no_config_read_test() ->
+    Root = unique_root(),
+    {Exit, Output} = rebar3_reltree_cli:run(["bgate", "--help"],
+                                             #{cwd => Root}),
+    Text = lists:flatten(Output),
+    ?assertEqual(0, Exit),
+    ?assert(string:str(Text, "--check") > 0),
+    ?assert(string:str(Text, "--write") > 0),
+    ?assertNot(filelib:is_regular(filename:join(Root, "project.md"))).
+
+bgate_no_workflow_is_successful_and_does_not_load_config_test() ->
+    Root = unique_root(),
+    ok = file:make_dir(Root),
+    ok = file:write_file(filename:join(Root, "rebar.config"), <<"{bad, [}.\n">>),
+    {Exit, Output} = rebar3_reltree_cli:run(["bgate", "--check"],
+                                             #{cwd => Root}),
+    ?assertEqual(0, Exit),
+    ?assert(string:str(lists:flatten(Output), "bgate skipped") > 0),
+    ?assertNot(filelib:is_regular(filename:join(Root, "project.md"))),
+    remove_fixture(Root).
 
 current_project_failure_is_fatal_without_writes_test() ->
     Root = unique_root(),

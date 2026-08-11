@@ -3,6 +3,7 @@
 -export([
     extract_config/1,
     normalize/1,
+    normalize_bgate/1,
     parse_cli/1,
     parse_cli_root/1,
     format_error/1
@@ -67,8 +68,27 @@ parse_cli(["-h"]) ->
     {help, top};
 parse_cli(["tree" | Args]) ->
     parse_tree_args(Args, undefined, undefined);
+parse_cli(["bgate" | Args]) ->
+    parse_bgate_args(Args);
 parse_cli([Command | _]) ->
     {error, {invalid_command, Command}}.
+
+-spec normalize_bgate(map()) -> {ok, map()} | {error, term()}.
+normalize_bgate(Context) when is_map(Context) ->
+    case {maps:find(cwd, Context), maps:find(mode, Context)} of
+        {{ok, Cwd}, {ok, Mode}} when is_list(Cwd) ->
+            case Mode of
+                check -> {ok, #{command => bgate, mode => check,
+                                project_root => filename:absname(Cwd)}};
+                write -> {ok, #{command => bgate, mode => write,
+                                project_root => filename:absname(Cwd)}};
+                _ -> {error, {invalid_context, mode, Mode}}
+            end;
+        _ ->
+            {error, {invalid_context, missing, bgate_request}}
+    end;
+normalize_bgate(Other) ->
+    {error, {invalid_context, request, Other}}.
 
 -spec parse_cli_root(term()) ->
     {ok, {term(), shallow | deep}} | {error, term()}.
@@ -88,7 +108,12 @@ parse_cli_root(Path) ->
 
 -spec format_error(term()) -> iolist().
 format_error({invalid_command, Command}) ->
-    io_lib:format("unknown command ~p; use 'tree'", [Command]);
+    io_lib:format("unknown command ~p; use 'tree' or 'bgate'", [Command]);
+format_error({invalid_mode, Detail}) ->
+    io_lib:format("invalid bgate mode: ~p", [Detail]);
+format_error({conflicting_modes, First, Second}) ->
+    io_lib:format("bgate modes --~ts and --~ts cannot be combined",
+                  [First, Second]);
 format_error({invalid_option, Option, Value}) ->
     io_lib:format("invalid ~p value ~p", [Option, Value]);
 format_error({missing_option_value, Option}) ->
@@ -108,6 +133,8 @@ format_error({invalid_context, Key, Value}) ->
     io_lib:format("invalid request context ~p value ~p", [Key, Value]);
 format_error({config_read, Path, Reason}) ->
     io_lib:format("cannot read config ~ts: ~p", [Path, Reason]);
+format_error({bgate, Reason}) ->
+    rebar3_reltree_badge:format_error(Reason);
 format_error(Reason) ->
     io_lib:format("reltree request failed: ~p", [Reason]).
 
@@ -209,6 +236,40 @@ parse_tree_args([Option | _], _Roots, _Rev) when is_list(Option),
                                                  hd(Option) =:= $- ->
     {error, {invalid_option, option_atom(Option), Option}};
 parse_tree_args([Argument | _], _Roots, _Rev) ->
+    {error, {extra_argument, Argument}}.
+
+parse_bgate_args([]) ->
+    {error, {invalid_mode, missing}};
+parse_bgate_args(["--help" | _]) ->
+    {help, bgate};
+parse_bgate_args(["-h" | _]) ->
+    {help, bgate};
+parse_bgate_args(["--check"]) ->
+    {ok, #{command => bgate, mode => check}};
+parse_bgate_args(["--write"]) ->
+    {ok, #{command => bgate, mode => write}};
+parse_bgate_args(["--check", "--check" | _]) ->
+    {error, {duplicate_option, check}};
+parse_bgate_args(["--write", "--write" | _]) ->
+    {error, {duplicate_option, write}};
+parse_bgate_args(["--check", "--write" | _]) ->
+    {error, {conflicting_modes, "check", "write"}};
+parse_bgate_args(["--write", "--check" | _]) ->
+    {error, {conflicting_modes, "write", "check"}};
+parse_bgate_args(["--check", Value | _]) ->
+    case lists:prefix("--", Value) of
+        true -> {error, {invalid_option, mode, Value}};
+        false -> {error, {extra_argument, Value}}
+    end;
+parse_bgate_args(["--write", Value | _]) ->
+    case lists:prefix("--", Value) of
+        true -> {error, {invalid_option, mode, Value}};
+        false -> {error, {extra_argument, Value}}
+    end;
+parse_bgate_args([Option | _]) when is_list(Option), Option =/= [],
+                                    hd(Option) =:= $- ->
+    {error, {invalid_option, option_atom(Option), Option}};
+parse_bgate_args([Argument | _]) ->
     {error, {extra_argument, Argument}}.
 
 option_atom("--root") -> root;

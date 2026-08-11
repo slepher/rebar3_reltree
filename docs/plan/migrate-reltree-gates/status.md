@@ -10,15 +10,15 @@
 ## Current phase
 
 - Phase: `planning`
-- Current task: `none`
+- Current task: `task-4`
 - Implementation stage: `none`
-- Next action: freeze task-1.md from the reconciled plan, then dispatch the coding worker
+- Next action: dispatch task-4 coding worker for local bgate --check|--write, then run independent verification.
 
 ## Repository snapshot
 
-- Current source/config/test files: none; `release.md` and `completed.md` are copied documentation,
-  and the durable initiative documents are present.
-- `.git` was initialized successfully with branch `master`; the repository has no HEAD commit yet.
+- Current task-1/task-2 source, config, and test files are present in the working tree; task-2 is
+  committed locally and the initiative documents remain unstaged.
+- `.git` was initialized successfully with branch `master`; task-1, task-2, and task-3 have local commits.
 - Erlang/OTP: OTP 29 / ERTS 17.0.4.
 - Rebar3: 3.25.1.
 - Sibling source is read-only input only; its `check_badges` provider is absent.
@@ -39,7 +39,67 @@
   bounded scan roots, checkout relationship rules, and `bgate` behavior.
 - Planner reconciliation completed: `plan.md` now contains five ordered tasks for the skeleton,
   local graph/report, external revisions/timestamps, bgate, and reltree skill/installer.
+- `task-1.md` is frozen and accepted as the implementation contract for the skeleton and shared
+  request boundary.
+- Coding worker self-tests completed: compile exit 0; EUnit exit 0 with 35 tests and 0 failures;
+  escriptize exit 0; help exits 0; valid unavailable-engine exit 1; invalid rev exit 2;
+  report absence and `git diff --check` exit 0. Generated `rebar.lock` was removed as an
+  unowned temporary artifact.
+- Independent runner repeated compile, EUnit (35/0), escriptize, help, expected exit 1/2,
+  report absence, status, and diff checks successfully. Runner-generated `_build/` and
+  `rebar.lock` were cleaned after its interrupted cleanup attempt.
+- Sol review 1 returned `changes_required`: preserve duplicate top-level `reltree` configuration
+  through the provider adapter and classify malformed configured scan roots as configuration errors.
+  Retrospective found no reusable workflow-skill gap.
+- User resolved the review blocker: duplicate top-level reltree configuration is ignored and follows
+  Rebar3 last-value-wins behavior; it is no longer an error or provider/escript parity blocker.
+- Planner revised plan.md and task-1.md accordingly; review-1 and its retrospective remain immutable.
+- Rework coding self-tests completed: compile exit 0; EUnit exit 0 with 40 tests and 0 failures;
+  escriptize/help/error/no-write checks passed; generated artifacts were cleaned.
+- Independent runner passed compile, EUnit (40/0), escriptize, help, expected exit 1/2,
+  report absence, status, and diff checks; no commands were interrupted and generated artifacts
+  were cleaned.
+- Sol review 2 passed with no material findings; review artifact is
+  `task-1-code-review-2.md` and continuity recommends reusing Sol for task-2.
+- Dispatcher committed task-1 as `54b1cce` with subject `feat: scaffold reltree plugin and escript`;
+  staged scope matched the ten task-owned paths and `git diff --cached --check` exited 0.
+- Sol continuity wrote and accepted `task-2.md`; it adds the shared dispatch module to task-2
+  ownership and selects commit subject `feat: generate local reltree reports`.
+- Task-2 implementation now has a passing baseline from an independent read-only runner:
+  compile exit 0; EUnit exit 0 with 71 tests and 0 failures; CT exit 0 with 4 tests passed;
+  escriptize exit 0; `git diff --check` exit 0. The runner confirmed that the previous five
+  obsolete task-1 expectations no longer fail.
+- At the earlier task-2 checkpoint, the runner could not establish complete contract-level evidence
+  for every fixture, mutation, deterministic-diff, symlink/hardlink, anomaly, and provider/CLI
+  boundary required by `task-2.md`. Build artifacts (`_build/`, `rebar.lock`, and
+  `erl_crash.dump`) were removed after verification.
+- A read-only contract review then identified five concrete task-2 defects. The working diff now
+  contains corresponding implementation and regression-test changes for UTF-8 report rendering,
+  filesystem-identity candidate de-duplication, memory-only report rendering, restricted
+  `rc.N`/`ci.N` prerelease parsing, and single-warning unreadable scan roots. The worker and its
+  follow-up independent runner were interrupted before returning command evidence, so these
+  changes were awaiting the final verification recorded below.
+- Final coding self-test after those fixes passed: compile exit 0; EUnit 84/0; CT 4/0;
+  escriptize exit 0; `git diff --check` exit 0. The independent runner separately reproduced
+  compile 0, EUnit 84/0, CT 4/0, and escriptize 0. The only escriptize output was a non-fatal
+  timestamp-before-1980 warning.
+- Final static review found no material code findings and confirmed no task-3 bgate/installer or
+  remote-revision implementation leaked into task-2. Dispatcher committed task-2 as
+  `1979be3 feat: generate local reltree reports`; only initiative documents remain unstaged.
+- Sol wrote `task-3.md` for external/local revision tracking and synchronization timestamps;
+  it preserves the default `auto`, local-only/no-fetch boundary, stale/error semantics, and
+  the commit subject `feat: track external revisions in reltree`.
+- Task-3 coding self-test and independent verification both passed: compile 0; EUnit 98/0;
+  revision EUnit 13/0; CT 4/0; escriptize 0; `git diff --check` 0. Evidence includes local
+  bare Git HEAD/branch/lightweight and annotated tag peel/ref/error/argv checks, prior-report
+  state validation, duplicate identity reuse/conflict behavior, and renderer clock isolation.
+- Final Sol review found no material findings. Dispatcher committed task-3 as
+  `11e4706 feat: track external revisions in reltree`; only initiative documents remain
+  unstaged.
+- Sol wrote `task-4.md` with the user-narrowed local `bgate --check|--write` scope,
+  including no-CI warning behavior, master fallback, badge preservation, README.zh parity,
+  error paths, provider/escript parity, and the commit subject `feat: add reltree badge gate`.
 
 ## Blocker
 
-- None. Git metadata is now writable and the task lifecycle can proceed.
+- None. Task-3 is complete locally; task-4 planning is next.

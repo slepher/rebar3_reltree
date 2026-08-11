@@ -1,16 +1,10 @@
 # Erlang 项目版本发布规范
 
-本文档定义以下同级项目的版本、依赖、tag、README badge 与发布顺序：
+本文档定义 Erlang 项目的版本、依赖、tag、README badge 与发布顺序。项目集合及其依赖
+关系不在本文档中硬编码，由 `rebar3 reltree tree` 根据当前本地项目生成。
 
-- `astranaut`
-- `erlando`
-- `lenses`
-- `async`
-- `rebar3_erlando`
-- `rebar3_docker_ci`
-- `rebar3_reltree`
-
-目标是让各项目独立发布，同时在确实需要联合发布时保持依赖关系、版本线和发布制品一致。
+目标是让各项目独立发布，同时在确实需要联合发布时依据当前项目树保持依赖关系、版本线和
+发布制品一致。
 
 ## 1. 基本原则
 
@@ -63,28 +57,10 @@
 
 ## 3. 依赖关系与联合发布
 
-运行时依赖为：
-
-```text
-astranaut
-├── erlando
-├── lenses
-└── async
-
-erlando
-├── lenses
-└── async
-
-lenses
-└── async
-```
-
-工具关系为：
-
-```text
-rebar3_erlando      普通 rebar 插件；erlando 会使用
-rebar3_docker_ci    CI 工具；各项目按需使用
-```
+执行联合发布前，运行 `rebar3 reltree tree`，并以当前 profile 生成的 `project.md` 作为本次
+本地项目集合、runtime dependency、upstream 和 downstream 关系的事实来源。不得根据本文档
+中的项目名称、历史拓扑或固定目录位置推断关系。`project.md` 为
+`insufficient-local-data` 时，不得补猜缺失关系。
 
 联合发布遵循以下规则：
 
@@ -130,42 +106,45 @@ rebar3_docker_ci    CI 工具；各项目按需使用
 - Hex、许可证、覆盖率等其他 badge 不受影响；
 - 没有 `ci.yml` 的仓库不添加虚假的 CI badge。
 
-## 5. 仓库内 release skill 与用户级安装
+## 5. `reltree` skill 与用户级安装
 
-`rebar3_docker_ci` 仓库负责维护 `release-version-gates` Codex skill。仓库根目录的 `release.md` 是面向开发者的唯一规范来源。
+`rebar3_reltree` 同时发布 Rebar3 plugin 和安装 escript。Rebar3 plugin 提供项目树、
+版本门禁和 badge 门禁命令；escript 只用于把本仓库维护的 `reltree` Codex skill 安装到
+用户级 skills 目录，不提供 `tree`、`checkvsn`、`bgate` 或其他项目管理命令。
 
 skill 的可打包源码位于：
 
 ```text
-priv/skills/release-version-gates/
+priv/skills/reltree/
 ├── SKILL.md
-├── agents/openai.yaml
-└── references/release.md
+└── agents/openai.yaml
 ```
 
-其中 `references/release.md` 是仓库根目录 `release.md` 的同步副本。确定性测试必须在两者不一致时失败。skill 内不得创建额外 README。
+skill 只包含自身工作流和 agent metadata，不打包发布规范副本，也不得创建额外 README。
 
-通过本仓库命令安装到用户级 Codex skills 目录：
+通过本项目生成的安装 escript 安装到用户级 Codex skills 目录：
 
 ```bash
-rebar3 docker_ci install_release_skill
+reltree skill --install
 ```
 
 安装规则：
 
-- `CODEX_HOME` 已设置时，默认安装到 `$CODEX_HOME/skills/release-version-gates`；
-- 否则安装到用户主目录下的 `.codex/skills/release-version-gates`；
-- `--dest DIR` 用于显式指定 skills 父目录，命令在其下追加 `release-version-gates`；
+- `CODEX_HOME` 已设置时，默认安装到 `$CODEX_HOME/skills/reltree`；
+- 否则安装到用户主目录下的 `.codex/skills/reltree`；
+- `--dest DIR` 用于显式指定 skills 父目录，命令在其下追加 `reltree`；
 - 目标已存在时默认失败，不静默覆盖；只有显式传入 `--force` 才允许替换；
 - 强制替换必须使用临时目录加原子重命名、回滚或同等安全方式，失败后不得留下半安装或新旧文件混合状态；
 - 安装完成后报告准确目标路径；
 - 安装器只进行本地文件操作，不访问 Git 或网络，不创建、移动或推送 tag，不发布任何制品。
 
-安装后的 skill 负责指导发布决策；`check_badges` 独立执行版本与 badge 门禁。门禁运行时不得依赖用户已经安装该 skill。
+安装后的 skill 使用 Rebar3 plugin 提供的本地事实管理当前项目。plugin 命令独立运行，
+不以用户已经安装该 skill 为前提。
 
-## 6. reltree project.md 发布树参考
+## 6. reltree `project.md` 项目树参考
 
-`rebar3_reltree` 提供一个面向 release skill 的本地项目树参考对象。它只描述当前项目及其
+`rebar3_reltree` Rebar3 plugin 提供一个供 `reltree` skill 使用的本地项目树参考对象。
+它只描述当前项目及其
 可证明的本地上下游关系，不是通用依赖数据库，也不把正常的外部 runtime dependency 当作
 项目树节点。
 
@@ -273,36 +252,24 @@ rebar3 reltree bgate --write
 - 两个 README 按固定顺序写入；不要求跨文件原子更新；失败时返回具体文件和原因；
 - `bgate` 不生成或修改 `project.md`。
 
-## 7. 本地发布门禁
+## 7. `checkvsn` 本地版本门禁
 
-`rebar3_docker_ci` 应提供纯本地命令：
-
-```bash
-rebar3 docker_ci check_badges
-```
-
-该命令不得读取 GitHub Actions 环境变量，不得访问网络，只读取本地 Git 和文件系统。CI 在执行前必须确保 tags 已获取到本地。
-
-门禁负责：
-
-- 校验正式 tag `X.Y.Z` 或 `vX.Y.Z` 等于 `app.src` 版本；
-- 校验 `rc/ci` tag 的基础版本等于 `app.src`；
-- 忽略 `check-*`；
-- 校验 `app.src` 等于最高可达正式版本，或是严格连续的下一兼容、下一破坏性或明确的新世代版本；
-- 禁止版本跳跃；
-- 存在 `ci.yml` 时，校验唯一的 `master CI` badge；
-- 存在正式 tag 时，校验唯一的最高正式版本 `release CI` badge；
-- 校验中英文 README 的 CI badge 一致；
-- 保留并忽略其他类型 badge；
-- 不存在 `ci.yml` 时，成功跳过 badge 要求，但继续执行适用的 tag 与版本线校验。
-
-同一提交存在多个候选发布 tag 时，必须显式指定本次校验目标：
+`rebar3_reltree` Rebar3 plugin 提供纯本地版本门禁：
 
 ```bash
-rebar3 docker_ci check_badges --ref TAG
+rebar3 reltree checkvsn
 ```
 
-该门禁应集成到存在 workflow 的项目 CI 中。CI checkout 后必须先确保本地 tags 可见，再运行同一条本地命令。
+该命令不得读取 GitHub Actions 环境变量，不得访问网络，只读取本地 Git 和文件系统。
+
+门禁只负责：
+
+- 校验 tag 与 `app.src` 版本一致；正式 tag 使用 `X.Y.Z` 或 `vX.Y.Z`，`rc/ci` tag
+  使用其基础版本，`check-*` 不参与校验；
+- 校验版本连续；`app.src` 必须等于最高可达正式版本，或是严格连续的下一兼容、
+  下一破坏性或用户明确选择的新世代版本，不得跳版本。
+
+README badge 不属于 `checkvsn` 的职责，由第 6.4 节的 `bgate --check|--write` 负责。
 
 ## 8. 单项目正式发布流程
 
@@ -313,24 +280,20 @@ rebar3 docker_ci check_badges --ref TAG
 5. 永久保留 `master CI`；把 `release CI` 更新为目标正式 tag。
 6. 创建 release commit。
 7. 在该 commit 上创建本地 annotated tag。
-8. 运行 `rebar3 docker_ci check_badges --ref TAG` 和项目完整测试。
+8. 运行 `rebar3 reltree checkvsn`、`rebar3 reltree bgate --check` 和项目完整测试。
 9. 只有用户明确要求时才执行远端操作。
 10. 推送时先推 tag，再推包含同一 release commit 的 `master`；也可以在一次明确的 Git 操作中同时推送两者。
-11. 等待 tag CI 全部通过。
-12. 只有 tag CI 通过后，才能创建 GitHub Release、发布 Hex 或其他制品。
 
 发布 badge 提交不能提前作为没有对应 tag 的普通 `master` 提交推送。业务代码可以先通过 PR 合并，最终版本、release badge 和发布元数据由单独的 release commit 完成。
 
 ## 9. 多项目正式发布流程
 
-可以在本地为所有目标项目准备提交和 tag，但远端发布必须逐层进行：
+可以在本地为所有目标项目准备提交和 tag。涉及多个项目时按依赖关系逐层发布：
 
 ```text
-推送上游 tag
-  → 上游 tag CI 通过
-    → 推送直接下游 tag
-      → 下游 tag CI 通过
-        → 继续下一层
+创建上游 tag
+  → 更新直接下游依赖并创建其 tag
+    → 继续下一层
 ```
 
 每一层都只能引用已经按要求创建的上游 tag。只有用户明确列入本次发布范围的下游才参与发布。
@@ -340,9 +303,6 @@ rebar3 docker_ci check_badges --ref TAG
 - 尚未推送的本地 tag 默认允许移动或重建。
 - 远程 tag 默认不可覆盖；只有用户明确要求时才能进入覆盖流程。
 - 无论能否查询远端，工具都不得默认 push。
-- 正式远程 tag CI 失败：默认修复后提升第三位并创建新正式 tag。
-- `rc/ci` tag 失败：修复后创建下一个预发布序号。
-- CI 未通过的 tag 不得创建 GitHub Release 或发布制品。
 - 已经公开的 Release 或制品不得通过移动同名 tag 替换。
 
 ## 11. 发布后核对
@@ -354,5 +314,30 @@ rebar3 docker_ci check_badges --ref TAG
 - [ ] `README.md` 与现有的 `README.zh.md` 内容和 CI badge 一致。
 - [ ] `master CI` 始终指向 `master`。
 - [ ] `release CI` 指向最高可达正式 tag。
-- [ ] tag CI 全绿，Release/Hex/其他制品来自该 tag。
 - [ ] 没有因为插件、CI、badge 或文档的单独变化误升应用版本。
+
+## 12. 项目关系示例
+
+以下内容只演示 `project.md` 可能表达的 runtime dependency 和工具声明，不是当前项目关系的
+事实来源，也不参与发布判断：
+
+```text
+astranaut
+├── erlando
+├── lenses
+└── async
+
+erlando
+├── lenses
+└── async
+
+lenses
+└── async
+```
+
+```text
+rebar3_erlando      普通 Rebar3 plugin；某个项目可以按需使用
+rebar3_docker_ci    CI 工具；某个项目可以按需使用
+```
+
+实际关系始终由执行 `rebar3 reltree tree` 后生成的当前 `project.md` 决定。

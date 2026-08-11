@@ -208,15 +208,22 @@ but return a specific no-write `tree_engine_unavailable` error until task-2.
   slice. No supervision tree or third-party runtime library is added.
 - Provider and escript accept `tree`, repeatable
   `--scan-roots PATH[:deep]`, and `--rev false|auto|true`. The provider reads
-  `{reltree, [...]}` from the inspected project's `rebar.config`, takes the
-  active profile from Rebar3 state, and uses cwd as project root. The escript
-  reads the same config from cwd and uses profile `default`.
+  the already evaluated `reltree` value from Rebar3 state, takes the active
+  profile from that state, and uses cwd as project root. The escript reads the
+  inspected project's `rebar.config` from cwd and uses profile `default`.
+  Duplicate top-level `{reltree, Options}` terms are not an error: both
+  surfaces use Rebar3 last-value-wins semantics. The provider consumes the
+  value already selected by Rebar3 without recovering raw config terms; the
+  escript selects the last top-level `reltree` value itself and ignores every
+  earlier one.
 - CLI scan roots replace configured roots when at least one is present.
   Otherwise configured `{scan_roots, Roots}` applies; otherwise the default is
   `['..']` represented internally as shallow. Plain paths are shallow;
   `PATH:deep` and config tuple `{Path, deep}` are deep. Invalid/empty modes,
   paths, duplicate contradictory root modes, extra positional arguments, and
-  unknown options fail before any product write.
+  unknown options fail before any product write. A malformed or empty path
+  originating in configured `scan_roots` is `invalid_config`; the equivalent
+  CLI-originated invalid path is `invalid_option`.
 - Config and argument parsing are pure/testable; `main/1` and provider `do/1`
   only adapt output and exit/provider results. Both surfaces produce the same
   normalized request for equivalent inputs.
@@ -237,6 +244,10 @@ but return a specific no-write `tree_engine_unavailable` error until task-2.
 3. Register the namespaced `tree` provider and thin escript adapter.
 4. Cover metadata, defaults, override precedence, shallow/deep syntax,
    invalid inputs, adapter parity, help, and no-write unavailable behavior.
+   Regression coverage must prove duplicate top-level `reltree` terms select
+   the last value on both surfaces without raw provider config access, and
+   that malformed/empty configured roots remain `invalid_config` while CLI
+   invalid roots remain `invalid_option`.
 
 **Coding Self-Tests — coding worker**
 
@@ -246,13 +257,17 @@ but return a specific no-write `tree_engine_unavailable` error until task-2.
 - Invoke provider and built escript help, default tree request, repeated scan
   roots, and invalid rev/root cases in temporary fixture projects; record raw
   exits/output and prove no `project.md` is created.
+- EUnit assertions must include provider/escript last-value-wins regression
+  cases and distinct configured-root/CLI-root error-class regression cases.
 
 **Independent Verification — separate `luna_runner`**
 
 - Repeat every Coding Self-Test against the exact diff.
 - Record command completion, exits/test counts, provider metadata/help,
-  normalized provider/escript parity evidence, generated-path absence,
-  `git status --short`, and `git diff --check`.
+  generated-path absence, `git status --short`, and `git diff --check`.
+  Sol review accepts semantic parity only after inspecting that the exercised
+  assertions implement last-value-wins without provider raw-config recovery
+  and preserve the two root-error classes.
 
 **Expected paths, commit, and completion**
 
@@ -260,8 +275,9 @@ but return a specific no-write `tree_engine_unavailable` error until task-2.
   generated `_build/` remains ignored. No deletion is authorized.
 - Commit subject: `feat: scaffold reltree commands`
 - Complete when both command surfaces build, parse the exact frozen request,
-  fail safely before the engine exists, both evidence layers pass, and Sol
-  reviews the exact scope as passed.
+  apply the frozen last-value-wins and origin-specific error rules, fail safely
+  before the engine exists, both evidence layers pass, and Sol reviews the
+  exact scope as passed.
 
 **Stop conditions**
 
@@ -283,6 +299,7 @@ atomically render deterministic Markdown at the active profile path.
 
 **Owned product paths**
 
+- `src/rebar3_reltree.erl`
 - `src/rebar3_reltree_cli.erl`
 - `src/rebar3_reltree_prv_tree.erl`
 - `src/rebar3_reltree_request.erl`

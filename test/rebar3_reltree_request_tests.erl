@@ -95,7 +95,32 @@ cli_parser_success_test() ->
 cli_parser_help_test() ->
     ?assertEqual({help, top}, rebar3_reltree_request:parse_cli([])),
     ?assertEqual({help, top}, rebar3_reltree_request:parse_cli(["--help"])),
-    ?assertEqual({help, tree}, rebar3_reltree_request:parse_cli(["tree", "--help"])).
+    ?assertEqual({help, tree}, rebar3_reltree_request:parse_cli(["tree", "--help"])),
+    ?assertEqual({help, bgate}, rebar3_reltree_request:parse_cli(
+                                  ["bgate", "--help"])).
+
+bgate_parser_and_normalization_test() ->
+    ?assertEqual({ok, #{command => bgate, mode => check}},
+                 rebar3_reltree_request:parse_cli(["bgate", "--check"])),
+    ?assertEqual({ok, #{command => bgate, mode => write}},
+                 rebar3_reltree_request:parse_cli(["bgate", "--write"])),
+    ?assertMatch({error, {invalid_mode, missing}},
+                 rebar3_reltree_request:parse_cli(["bgate"])),
+    ?assertMatch({error, {conflicting_modes, _, _}},
+                 rebar3_reltree_request:parse_cli(
+                   ["bgate", "--check", "--write"])),
+    ?assertMatch({error, {duplicate_option, check}},
+                 rebar3_reltree_request:parse_cli(
+                   ["bgate", "--check", "--check"])),
+    ?assertMatch({error, {extra_argument, _}},
+                 rebar3_reltree_request:parse_cli(["bgate", "--check", "x"])),
+    ?assertMatch({error, {invalid_option, _, _}},
+                 rebar3_reltree_request:parse_cli(["bgate", "--check=true"])),
+    {ok, Request} = rebar3_reltree_request:normalize_bgate(
+                      #{cwd => "/workspace/project", mode => check}),
+    ?assertEqual(bgate, maps:get(command, Request)),
+    ?assertEqual(check, maps:get(mode, Request)),
+    ?assertEqual("/workspace/project", maps:get(project_root, Request)).
 
 cli_parser_failures_test() ->
     ?assertMatch({error, {invalid_command, "other"}},

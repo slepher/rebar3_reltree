@@ -4,11 +4,12 @@
 -include_lib("eunit/include/eunit.hrl").
 
 -export([all/0, provider_and_cli_surface/1, deep_relationship_closure/1,
-         anomaly_and_atomic_boundary/1, status_and_report_facts/1]).
+         anomaly_and_atomic_boundary/1, status_and_report_facts/1,
+         bgate_surface/1]).
 
 all() ->
     [provider_and_cli_surface, deep_relationship_closure,
-     anomaly_and_atomic_boundary, status_and_report_facts].
+     anomaly_and_atomic_boundary, status_and_report_facts, bgate_surface].
 
 provider_and_cli_surface(_Config) ->
     Root = rebar3_reltree_fixtures:new_root(),
@@ -110,6 +111,28 @@ status_and_report_facts(_Config) ->
                                       <<"nodes\n- none">>)),
     ?assertMatch({_, _}, binary:match(Bytes,
                                       <<"network_sync_at: not-performed">>)).
+
+bgate_surface(_Config) ->
+    Root = rebar3_reltree_fixtures:new_root(),
+    try
+        rebar3_reltree_fixtures:write_project(Root, ct_bgate, [], "0.1.0"),
+        rebar3_reltree_fixtures:add_origin(
+          Root, "https://github.com/acme/ct-bgate.git"),
+        rebar3_reltree_fixtures:write_file(
+          filename:join([Root, ".github", "workflows", "ci.yml"]),
+          <<"name: ci\n">>),
+        README = filename:join(Root, "README.md"),
+        rebar3_reltree_fixtures:write_file(README, <<"content\n">>),
+        {0, []} = rebar3_reltree_cli:run(["bgate", "--write"],
+                                          #{cwd => Root}),
+        {0, []} = rebar3_reltree_cli:run(["bgate", "--check"],
+                                          #{cwd => Root}),
+        {ok, Bytes} = file:read_file(README),
+        ?assertMatch({_, _}, binary:match(Bytes, <<"master CI">>)),
+        ?assertNot(filelib:is_regular(filename:join(Root, "project.md")))
+    after
+        rebar3_reltree_fixtures:cleanup(Root)
+    end.
 
 request(Root, ScanRoots, Profile) ->
     Build = filename:join([Root, "_build", atom_to_list(Profile)]),
