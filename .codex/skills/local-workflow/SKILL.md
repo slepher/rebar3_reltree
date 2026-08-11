@@ -1,525 +1,290 @@
 ---
 name: local-workflow
-description: Execute or resume multi-task repository work through a durable initiative directory containing plan.md and status.md, with Sol owning technical decisions and optionally bounded src edits, Luna completing implementation tests and verification, and the dispatcher routing decisions and performing authorized Git operations. The user's explicit Goal selects the initiative; unrelated plans must not be read or resumed. Use when starting a project plan, continuing a partially completed task, recovering after interruption or a new session, processing tasks one at a time, or requiring independent review and per-task commits. Use $delegate for all worker-routing mechanics.
+description: Execute or resume repository initiatives through durable plan.md, status.md, and commit.md artifacts, with Sol planning and reviewing small tasks, Luna implementing and self-testing, optional risk-triggered independent verification, and the dispatcher owning recovery, status, staging, and commits. Use for multi-task project work, interruption recovery, one-task-at-a-time implementation, review correction commits, and auditable code history. Use $delegate for all worker routing.
 ---
 
-# Project Workflow
+# Local Workflow
 
-Run one project task at a time. Use `$delegate` for role selection, spawn
-contracts, runtime identity checks, permissions, and result verification.
+Run one small, independently implementable, testable, reviewable, and
+committable task at a time. Use `$delegate` for role selection, worker identity,
+permissions, and result verification.
 
-## Goal routing
+## Route the requested goal
 
-The user's explicit `Goal` is authoritative for initiative selection. Treat
-phrases such as `Goal = transform-error`, `goal: transform-error`, or an
-explicit request to work on `transform-error` as the canonical initiative
-name, preserving the spelling used by the repository when resolving paths.
+Treat the user's explicit Goal as authoritative. Resolve it only to the matching
+repository initiative, normally `docs/plan/<Goal>/`. Before reading workflow
+artifacts:
 
-Before reading any workflow plan or status:
+1. Select only the requested Goal's initiative.
+2. Read its `plan.md`, `status.md`, `commit.md` when present, current task, and
+   current review artifacts.
+3. Read specifications named by the user, referenced by the task, or required
+   by repository instructions. Do not infer an OpenSpec path from the Goal.
+4. If the directory is absent, create the initiative. If its contents describe
+   another Goal, start a matching initiative instead of repurposing it.
 
-1. Resolve the requested Goal only to its repository-scoped initiative
-   directory, normally `docs/plan/<Goal>/`. Goal selects the workflow
-   initiative; it does not select, imply, or require an OpenSpec path.
-2. Read only the selected Goal's `plan.md`, `status.md`, and task artifacts.
-   Read OpenSpec documents independently when the user explicitly names them,
-   a task explicitly references them, or repository instructions require them.
-   Do not assume `openspec/changes/<Goal>/` exists, is authoritative, or must
-   match the initiative name. A plan with a similar subject, historical
-   migration, stale root `status.md`, or another Goal is unrelated unless the
-   user explicitly asks to use it.
-3. If the matching initiative directory is absent, create a new initiative
-   for the requested Goal. Do not infer that an existing unrelated initiative
-   is a predecessor, continuation, or source of requirements.
-4. If the matching initiative exists, reconcile it against the requested
-   Goal and the explicitly selected specification/input documents. If its
-   artifacts describe another Goal, treat them as invalid for this request
-   and start a fresh matching initiative rather than repairing or reusing it.
+Repeat the exact Goal and normative inputs in delegated contracts. Explicitly
+exclude unrelated plans and specifications.
 
-The Goal is also the top-level objective in the new `plan.md` and `status.md`.
-Every delegated contract must repeat the exact Goal, identify specification
-inputs separately from the initiative path, and explicitly state out-of-scope
-documents. When a user names a Goal, never let an old workflow artifact
-silently override the user's current specification.
+## Assign authority
 
-## Separate decisions from dispatch
+### Sol
 
-Sol owns every substantive workflow and technical decision: plan contents,
-task selection and contracts, review verdicts, coder-facing corrections,
-root-cause classification, local-skill changes, acceptance after review, and
-Sol continuity. Sol's written decision is authoritative unless the user
-overrides it or execution would violate an instruction, permission, safety
-boundary, or the actual repository state.
+Sol owns substantive decisions:
 
-The dispatcher does not reinterpret, adjudicate, summarize, or improve Sol's
-technical decisions. It routes complete evidence to Sol, forwards Sol-authored
-contracts and decisions verbatim to the selected worker, maintains `status.md`,
-performs identity and scope checks, requests required approvals, and executes
-authorized staging and commits. When a Sol decision cannot be executed safely
-or exactly, the dispatcher returns the blocker to Sol or the user instead of
-inventing a replacement decision.
+- requirement reconciliation and architecture;
+- `plan.md`, task selection, and task contracts;
+- file ownership, reuse decisions, data shapes, pseudocode, and stop conditions;
+- code review verdicts and coder-facing corrections;
+- deciding whether an unfinished task is too broad and revising the plan;
+- deciding whether independent verification is warranted;
+- selecting continuity to the next task.
 
-## Persist the initiative
+Sol is read-only for product source and tests unless a user-approved contract
+explicitly grants exact source paths. Sol never edits `status.md` or
+`commit.md`, stages, commits, delegates, or spawns children.
 
-Choose one project-relative artifact directory, normally
-`docs/plan/<Goal>/`. The dispatcher owns the directory choice, numbering, and
-`status.md`. Sol owns and directly writes every other workflow document inside
-that directory. Persist:
+### Luna coding worker
 
-- `plan.md`: goal, constraints, dependencies, migration order, and ordered
-  `task-M` contracts;
-- `status.md`: current repository snapshot, active task and phase, completed
-  boundaries, evidence, commit state, blocker, and exact next action;
-- `task-M.md`: implementation plan for exactly task M;
-- `task-M-code-review-N.md`: immutable Sol decision for review round N, written
-  for the next coding worker when the verdict is `changes_required`;
-- `task-M-code-review-N-retrospective.md`: immutable Sol-facing and human-audit
-  explanation of why the original design, contract, evidence gate, or workflow
-  rule failed to prevent a `changes_required` finding;
-- `task-M-code-review-N-skill-change-spec.md`: optional normative specification
-  written before changing this local skill and used as the sole basis for that
-  skill change.
+`luna_coding_worker` owns only the current task's exact product/test paths. It
+implements Sol's frozen behavior and blueprint, writes the required tests, runs
+every Coding Self-Test, fixes failures within scope, and returns the real diff
+and command evidence. It stops on an undecided behavior, unowned path, or
+contract conflict instead of making a product decision.
 
-Create `plan.md` and `status.md` together when the initiative starts. The
-initiative directory is invalid for execution if either is missing. Use the
-bundled [status template](assets/status-template.md) as the minimum status
-shape; add project-specific fields only when they improve recovery.
+### Luna runner
 
-Sol is read-only for product source and tests by default, and never owns
-staging, commits, or `status.md`. A task may explicitly opt into the staged
-simple-task path defined below; that exception grants Sol only the exact
-`src/` paths frozen by the task contract and never grants test ownership. Sol
-has explicit write ownership for `plan.md`, `task-M.md`,
-`task-M-code-review-N.md`, and
-`task-M-code-review-N-retrospective.md` inside the initiative directory. When
-needed, Sol also writes `task-M-code-review-N-skill-change-spec.md` and then
-directly updates
-`.codex/skills/local-workflow/SKILL.md`. Except for `status.md`, Sol is the
-authoritative writer for workflow documents and local skill corrections.
-The dispatcher checks only authority, declared scope, artifact presence, and
-whether execution matches Sol's explicit routing decision; it does not validate
-or overrule document content. Sol must verify that each skill diff conforms to
-its skill-change specification. Sol must not reread a document it has just
-written merely to transcribe, reconfirm, or restate its contents; its completed
-write and returned artifact path are sufficient. M is the task number. N starts
-at 1 for each task and increases monotonically. Never overwrite or renumber a
-task, review, or improvement record.
+`luna_runner` collects mechanical evidence or performs explicitly requested
+independent verification. It may inspect HEAD, status, paths, diffs, logs, and
+command results. During independent verification it runs specified commands
+without editing code or judging architecture and assertion semantics.
 
-Existing `task-M-review-N.md`, `task-M-review-improve-N.md`, and
-`task-M-review-improved-skill-N.md` files are legacy immutable artifacts. Read
-them when resuming their task, but never rename or rewrite them. Use the new
-names for every newly created review round.
+### Dispatcher
 
-Every Sol planning/review contract must explicitly grant write scope for the
-initiative's `plan.md`, current `task-M.md`, review artifacts, and, when
-applicable, `.codex/skills/local-workflow/SKILL.md`. The contract must explicitly
-forbid `status.md` edits, staging, commits, delegation, and child spawning. It
-must always forbid test edits and must forbid product-source edits unless it
-contains the staged simple-task grant defined below. A Sol review contract must
-always forbid running test, build, or acceptance commands. Those commands
-belong to the coding worker's mandatory self-test layer and the independent
-`luna_runner` verification layer.
-A dispatcher must never put CT, test, build, lint, or Independent Verification
-commands in a Sol contract. Route every Independent Verification command to a
-separate `luna_runner`. If a Sol contract contains such commands, Sol must
-reject that portion before tool execution and report the contract error.
+The dispatcher owns routing, worker identity and permission checks,
+`status.md`, `commit.md`, recovery coordination, scope checks, staging, and all
+Git commits. It forwards Sol decisions without technical reinterpretation and
+does not replace worker-authored evidence with its own technical conclusion.
+
+## Persist only useful history
+
+Keep these initiative artifacts:
+
+- `plan.md`: Goal, normative inputs, constraints, dependencies, and ordered
+  small tasks;
+- `status.md`: current repository snapshot, task, phase, evidence, blocker, and
+  one exact next action;
+- `commit.md`: append-only index of code commits by task and review correction;
+- `task-M.md`: complete implementation contract for task M;
+- `task-M-code-review-N.md`: immutable Sol review decision;
+- `task-M-code-review-N-retrospective.md`: create only for a systemic,
+  repeated, contract, evidence-gate, recovery, or workflow failure.
+
+The dispatcher writes `status.md` and `commit.md`; Sol writes plans, tasks, and
+reviews. Never overwrite or renumber an existing task or review artifact.
+
+`commit.md` exists for recovery and code-history inspection, not task
+execution. Do not send it to coding workers. Record only commits that change
+product source, tests, or implementation fixtures:
+
+```markdown
+## task-M
+
+- Initial implementation: <hash> <subject>
+- Review 1 correction: <hash> <subject>
+- Review 2 correction: <hash> <subject>
+- Final verdict: passed at review N
+```
+
+Do not index workflow-only commits in `commit.md`. A commit cannot record its
+own hash. After a code commit, append its real hash and include that ledger
+update in the following review commit. The final passed-review commit includes
+the last code mapping; do not create a separate final-ledger commit.
+
+For an existing initiative without `commit.md`, create it during recovery and
+reconstruct only code mappings supported by Git and immutable artifacts. Do not
+rewrite completed task history merely to normalize old records.
 
 ## Maintain resumable status
 
-Treat `status.md` as the workflow checkpoint and Git as the repository truth.
-Update status after every durable boundary:
-
-- overall plan created or revised;
-- task selected and `task-M.md` accepted;
-- coding started, any staged Sol source edit completed, changed paths updated,
-  and coding-worker self-tests completed;
-- independent verification completed;
-- each code-review decision and retrospective written;
-- each skill-change specification written and its conforming local-skill
-  correction applied;
-- rework started or completed;
-- task passed, commit attempted, and commit completed;
-- continuity decision executed;
-- blocker discovered or initiative completed.
-
-Record one current phase from:
+Use one phase:
 
 ```text
-planning | task_planning | coding | coding_self_test |
-independent_verification | review | rework | ready_to_commit |
-committing | handoff | blocked | complete
+planning | task_planning | coding | coding_self_test | review |
+rework | optional_verification | committing | handoff | blocked | complete
 ```
 
-Keep the exact next action singular and executable. Record commands with exit
-status rather than vague statements such as “tests passed.” Record live child
-IDs only as hints; they are not durable and must be rechecked before reuse.
-For a staged simple task in `coding`, also record `Implementation stage` as
-`sol_source` or `coding_completion`.
+Update status immediately after every durable boundary and before dispatching
+another worker: plan revision, task selection, coding return, self-test return,
+code commit, review decision commit, correction commit, optional verification,
+handoff, blocker, or completion. Record exact commands, exits, changed paths,
+commit hashes, and one executable next action. Child IDs are hints only.
 
-## Resume an interrupted task
+## Recover before continuing
 
-On every new session or continuation request:
+On every continuation, and whenever status conflicts with the worktree, enter
+recovery before dispatch:
 
-1. Locate the initiative directory and read `plan.md` and `status.md` before
-   planning or spawning workers.
-2. Read the active `task-M.md`, all existing `task-M-code-review-*` artifacts,
-   and any legacy `task-M-review-*` artifacts for that task.
-3. Inspect current HEAD, `git status --short`, the real diff, and expected task
-   paths. Git and immutable artifacts override stale status prose.
-4. Reconcile discrepancies in `status.md`; stop for clarification when current
-   changes cannot be safely attributed to the active task.
-5. Check whether a recorded child still exists before follow-up. If not, start
-   the appropriate fresh worker with a self-contained contract.
-6. Continue from the first incomplete phase. Do not regenerate accepted plans,
-   discard partial edits, or repeat completed gates unless later changes
-   invalidated their evidence.
+1. Read the selected plan, status, commit ledger, current task, and reviews.
+2. Inspect HEAD, `git status --short`, real diffs, untracked files, and expected
+   task paths. Git and immutable artifacts override stale status prose.
+3. Ask `luna_runner` for missing mechanical facts only when needed.
+4. Give Sol the raw packet. Sol returns:
 
-Resume by phase:
+```text
+Recovered Task:
+Recovered Phase:
+Attributable Paths:
+Completed Work:
+Valid Evidence:
+Invalidated Evidence:
+Remaining Work:
+Next Worker:
+Exact Next Action:
+```
 
-- `coding`: for a staged simple task, resume the recorded `sol_source` or
-  `coding_completion` stage without repeating completed work. After
-  `sol_source`, give the coding worker `task-M.md`, the current diff, completed
-  steps, failures, and remaining checks. For the normal path, resume the coding
-  worker directly.
-- `coding_self_test`: give the coding worker `task-M.md`, current diff,
-  completed steps, failures, and remaining checks; preserve partial work.
-- `independent_verification`: start a separate runner and execute the pending
-  verification against the current diff.
-- `review`: request the next missing review round using existing evidence.
-- `rework`: forward Sol's latest coder-facing review decision and current diff
-  to coding, then repeat both test layers.
-- `ready_to_commit` or `committing`: revalidate the exact change set and finish
-  the dispatcher-owned commit; do not start the next task first.
-- `handoff`: execute the recorded `reuse`/`fresh`/`none` decision; for `fresh`,
-  collect the required current repository packet first.
-- `blocked`: verify whether the recorded blocker changed; otherwise request the
-  missing authority or input.
-- `complete`: verify final repository status and report completion without
-  restarting the plan.
+5. The dispatcher reconciles `status.md` from that decision, then continues.
 
-## Create the overall plan
+Do not redispatch an apparently unstarted task when attributable implementation
+already exists. Do not discard partial work, rerun completed gates without an
+invalidation reason, or modify completed tasks to repair checkpoint prose.
 
-Have `luna_runner` collect only mechanical repository evidence when needed:
-HEAD, worktree/status, file names, existing command output, logs, and test
-counts. It must not judge source design, assertion meaning, architecture,
-scope legitimacy, or unresolved technical questions. Give the raw packet and
-file paths to Sol; Sol performs the code and design reading.
+## Plan small tasks
 
-Have Sol write and accept `plan.md` with independently verifiable tasks. Each plan task
-states its objective, owned area, behavior boundary, prerequisites,
-verification, and completion criteria. The dispatcher initializes and maintains
-`status.md` and records Sol's first eligible next action there without
-substantive reinterpretation.
+Sol writes tasks as vertical behavior slices. Each task must have one primary
+responsibility and be independently implementable, self-testable, reviewable,
+and committable. Include:
 
-### Stop on unresolved specification conflicts
+- objective and normative behavior;
+- prerequisites and exact owned paths;
+- `Must change`, bounded `May change`, and `Read only` paths;
+- existing capabilities to reuse and rejected alternatives;
+- input/output shapes, invariants, error and write boundaries;
+- concise function-level pseudocode or modification map;
+- success, failure, and boundary tests;
+- Coding Self-Tests, expected diff, stop conditions, and commit subject.
 
-When Sol finds conflicting requirements, incompatible committed capabilities, or
-an unresolved behavior choice, Sol must report `Clarification required` with the
-exact evidence, affected boundary, and decision owner. The dispatcher records
-the conflict as a blocker and must not resolve it by inventing a requirement,
-special case, fallback, compatibility rule, or task objective.
+Pseudocode decides architecture and data flow without prescribing every local
+expression. Luna may choose ordinary local Erlang structure when it preserves
+the contract.
 
-An unresolved decision is not an implementation task. Do not create a
-specification-cleanup, documentation-reconciliation, or “freeze the baseline”
-task solely to hide or work around the conflict unless the user explicitly
-requests that deliverable. Keep `Current task: none`, use `planning` or
-`blocked`, and leave dependent tasks ineligible until the decision is supplied.
-Unrelated tasks may be planned or dispatched only when their contracts do not
-depend on the unresolved choice.
+Do not use tests, runner repetition, or internal stages to compensate for a
+broad task. A task is too broad when it has multiple independently acceptable
+behaviors, needs an intermediate review before later work is safe, combines
+several complex responsibilities, needs separate test matrices, or cannot fit
+in one coding worker's coherent context. When this occurs before coding, split
+it in `plan.md` before dispatch.
 
-If the user supplies the decision, Sol revises the affected plan and freezes the
-resulting behavior before dispatch. If the user does not supply it, the
-dispatcher returns the blocker rather than converting it into a document task.
+### Split an unfinished broad task
 
-## Plan one task
+Completed, passed tasks are immutable. Sol may freely replace a not-started
+broad task in `plan.md` with smaller tasks.
 
-Sol selects one eligible task M from `plan.md` and writes only `task-M.md` for
-the selected task; do not transfer or rewrite that task contract in the
-dispatcher.
-Do not recursively create a second task hierarchy. Ordered implementation
-steps and checklists are allowed; nested task identifiers are not. If task M is
-too broad, Sol revises `plan.md` instead.
+If coding has started but the task remains unfinished:
 
-Only an eligible implementation, verification, migration, or explicitly
-user-requested specification task may be selected. A clarification, unresolved
-trade-off, or missing authority is a gate recorded in `status.md`, not a task
-that a worker can complete by choosing an outcome.
+1. Stop further implementation and recover the current diff.
+2. Have Sol identify the smallest complete behavior represented by existing
+   work and the remaining independent behaviors.
+3. Revise `plan.md` to mark the old task `superseded before completion`, state
+   the reason and replacement task numbers, and assign existing work to the
+   first replacement task.
+4. Preserve the old `task-M.md`; do not overwrite it or discard its diff.
+5. Create replacement tasks with the next monotonic integer numbers, not nested
+   stage identifiers.
+6. Implement, self-test, commit, and review each replacement independently.
 
-### Keep coder tasks implementation-only
-
-`task-M.md` is the implementation contract sent to a coding worker. Its owned
-paths and expected diff MUST be limited to product source, test files, and
-implementation fixtures explicitly required by the frozen behavior. Do not put
-OpenSpec, README, `plan.md`, `status.md`, review artifacts, or skill files in a
-coder task's owned paths, self-tests, or completion criteria. A coding worker
-must not be asked to update or validate documentation as part of an
-implementation task.
-
-When the frozen behavior requires a specification change, finish that change
-as a separate, explicitly authorized specification boundary before dispatching
-the dependent coder task. Sol must provide the exact final-state/edit map;
-the dispatcher must scope and commit that specification boundary separately.
-Do not combine specification edits with source/test implementation merely to
-reconcile documents during coding. Specification validation belongs to the
-specification boundary; coder self-tests cover only the implementation task's
-source and tests. If a proposed coder contract contains documentation paths or
-documentation-only commands, reject it and return it to Sol for rescoping.
-
-### Staged Sol implementation for simple `src/` tasks
-
-A task is eligible for the staged simple-task path when its Sol-owned source
-implementation is a simple, low-risk, fully frozen edit exclusively to code
-beneath `src/`; the task may still include exact test paths for Luna's separate
-completion stage.
-Keep it as one `task-M` with three sequential implementation and verification
-stages; do not create separate Sol and coding tasks. The task contract must
-explicitly include `Staged Simple Implementation: allowed` and define:
-
-- `sol_source`: the exact `src/` paths Sol owns for the initial source edit;
-- `coding_completion`: the exact test paths the coding worker owns, plus any
-  of the same exact `src/` paths it may edit only to fix failures exposed by
-  its self-tests without changing frozen behavior;
-- the fully decided end state, invariants, forbidden alternatives, required
-  test semantics, and concrete success, failure, and boundary scenarios;
-- ordered steps, objective scope checks, Coding Self-Tests, and the separate
-  `luna_runner` commands required for Independent Verification.
-
-Sol performs only `sol_source`. It must not edit tests or any path outside the
-granted `src/` set, and it must not run tests, builds, lints, acceptance, or
-other verification commands. After Sol completes the source edit and scope
-check, the dispatcher must route the same task and current diff to a
-`luna_coding_worker`. The coding worker implements the frozen tests, runs every
-Coding Self-Test, and makes only authorized bounded fixes. If no test-file edit
-is needed, it must still evaluate the existing tests against the frozen test
-semantics, record the bounded reason no test change is required, and run every
-Coding Self-Test.
-
-Luna owns test-file implementation and test self-test execution on this path.
-Test code style, abstraction quality, and refactoring quality are not review
-gates. The dispatcher and Sol enforce only declared test-path scope, command
-completion, and whether the test result/evidence satisfies the frozen behavior
-boundary; do not create findings merely to improve test structure or style.
-
-If either the source implementation or test completion becomes ambiguous,
-broad, architectural, higher-risk, or dependent on an unowned path, stop the
-staged path. Sol must revise the contract to the normal coding-worker path, and
-the coding worker then owns the complete implementation and self-test work. No
-worker may silently widen the staged grant.
-
-Require `task-M.md` to include:
-
-- decisive evidence, approach, owned files or modules, and invariants;
-- the selected execution path and, for a staged simple task, exact
-  `sol_source` and `coding_completion` ownership;
-- frozen test semantics and required success, failure, and boundary scenarios;
-- ordered implementation steps and stop conditions;
-- `Coding Self-Tests` run by the coding worker;
-- `Independent Verification` run later by a separate runner;
-- expected tracked paths, permitted untracked paths, authorized deletions;
-- proposed commit subject and completion criteria.
-
-### Freeze decisions before coding dispatch
-
-Before routing a coding worker or granting staged Sol implementation, Sol must
-freeze every substantive technical and specification decision in `task-M.md`.
-The contract must state the accepted end
-state, exact owned paths, invariants, forbidden alternatives, Coding
-Self-Tests, frozen test semantics and scenarios, and stop conditions.
-Reconciliation, interpretation, or choice among conflicting requirements or
-test meaning is Sol work, never coding-worker work.
-
-Sol must not freeze a choice that belongs to the user or specification owner.
-When the accepted end state is unavailable, Sol writes no coding contract for
-the dependent task and returns the conflict as `Clarification required`. A
-document-only contract that merely records, reconciles, or chooses among the
-conflicting requirements is not a substitute for that authority.
-
-If implementation exposes an ambiguity or conflict the contract did not
-decide, the coding worker stops and reports the exact evidence instead of
-choosing a resolution. Dispatcher preflight rejects a contract that omits the
-required fields or states an unresolved design choice, and returns it to Sol
-for a written decision artifact before dispatch; the dispatcher checks
-completeness only and does not supply or adjudicate the decision.
-
-For a specification rewrite, Sol must give an exact final-state/edit map for
-each owned document or section. An open-ended objective such as “reconcile” is
-not dispatchable unless the contract also fixes the resulting requirements,
-terminology, retained behavior, removed behavior, and cross-document outcome.
+Ordered coding steps may exist inside one task, but they are not workflow
+stages, review gates, or separate acceptance units. If a step needs its own
+review, make it a task.
 
 ## Implement and self-test
 
-For the normal path, send `task-M.md` to `luna_coding_worker`. It owns both
-implementation and every Coding Self-Test. It must run those commands directly
-after implementation and after each rework. It may not omit or delegate them
-because independent testing will happen later. A failed self-test stays with
-coding responsibility until fixed or genuinely blocked.
+Send the current `task-M.md`, applicable repository instructions, decisive
+source paths, and current attributable diff to one `luna_coding_worker`. Do not
+require it to read the overall plan, status, commit ledger, workflow skill, or
+retrospectives; promote every coder-relevant decision into the task contract or
+latest coder-facing review.
 
-For the staged simple-task path, Sol performs only the explicitly granted
-`sol_source` edits and returns the scope-checked diff. The dispatcher then sends
-`task-M.md` and that diff to a `luna_coding_worker` for the mandatory
-`coding_completion` stage. The worker must inspect the source diff, implement
-the frozen test scenarios, run every Coding Self-Test, and fix failures only
-within its exact authorized paths and frozen behavior. A failed self-test stays
-with coding responsibility until fixed or genuinely blocked.
+The worker implements the task and directly runs every Coding Self-Test. Tests
+prove the small task's frozen behavior; they do not compensate for unresolved
+design or excessive scope. A failed self-test remains coding responsibility
+until fixed or genuinely blocked.
 
-Treat `task-M.md` as the coding worker's complete implementation contract. Give
-the worker applicable repository instructions, required domain references, the
-current diff, and decisive source paths, but do not require it to read
-`plan.md`, `status.md`, this workflow skill, retrospectives, or skill-change
-specifications. Sol must promote every coder-relevant decision into `task-M.md`
-or the current `task-M-code-review-N.md` before the dispatcher routes it.
+After self-tests pass, the dispatcher:
 
-## Verify independently
+1. verifies worker identity and complete command evidence;
+2. compares status/diff paths with exact task scope;
+3. confirms every deletion was authorized;
+4. stages explicit code/test/fixture paths only;
+5. runs `git diff --cached --check`;
+6. verifies the staged name set exactly;
+7. commits the task implementation immediately with the accepted subject;
+8. appends the real hash to `commit.md` and records it in status.
 
-Only after coding-worker self-tests pass, spawn a separate `luna_runner` with
-`fork_turns = "none"`. Give it `task-M.md`, the current diff, and the Independent
-Verification commands. It must execute the checks itself against the current
-worktree, rerun task acceptance tests at minimum, and must not rely on the
-coding worker's summary. Its job is mechanical only: execute commands and
-return raw command results, exit statuses, test counts, timeout/interruption
-state, and status/diff name outputs. It must not inspect or audit source code,
-test assertion semantics, architecture, or conceptual scope. It reports
-mechanical failures without editing code.
+Do not wait for task review to create the implementation commit. Do not amend,
+squash, or rewrite it to hide later review corrections.
 
-All command and test execution for Independent Verification belongs exclusively
-to a separate `luna_runner`. Sol must never run CT, tests, builds, lints, or
-verification commands during planning or review, even when a review prompt
-mistakenly requests them. Sol owns all source, test-assertion, design,
-architecture, and semantic scope audits, but consumes the runner's raw
-mechanical packet. An accidental Sol-run command is non-gating evidence and
-never substitutes for the required runner result.
+## Review the committed code
 
-On failure, route exact evidence through the dispatcher to Sol. Sol decides the
-coder-facing correction and returns the exact rework instruction to the
-dispatcher. Route every implementation or test correction to the coding worker,
-rerun Coding Self-Tests, then start independent verification again. Keep both
-evidence sets; neither substitutes for the other.
+Sol formally reviews the fixed implementation commit, not a moving uncommitted
+diff. Give Sol the task contract, reviewed commit and diff, decisive source and
+test paths, coding self-test packet, and prior reviews. Sol performs semantic,
+architecture, assertion-meaning, scope, and capability-reuse review and writes
+exactly one verdict:
 
-## Review until passed
+- `changes_required`: ordered findings, exact evidence, and the smallest
+  coder-facing correction blueprint;
+- `passed`: no material finding remains and the reviewed code commit satisfies
+  the task contract.
 
-For review round N, give Sol `plan.md`, `task-M.md`, the real diff, prior
-`task-M-code-review-*`, legacy `task-M-review-*`, coding self-test evidence,
-independent verification evidence, and decisive source paths. Sol writes
-`task-M-code-review-N.md` with exactly one verdict:
+The dispatcher commits every review artifact immediately as a workflow-only
+review commit. Include current `status.md`, the ledger mapping for the reviewed
+code commit, and a retrospective only when its systemic trigger applies.
 
-- `changes_required`: actionable findings ordered by severity, exact evidence,
-  and smallest valid corrections;
-- `passed`: no material finding remains, the mandatory coding-worker self-test
-  evidence and independent-runner evidence satisfy the contract, and the diff
-  matches the declared commit scope.
+For `changes_required`, send only the review decision, task contract, current
+code, and permitted paths to Luna. After correction self-tests pass, the
+dispatcher creates a new code commit named for `task-M review-N correction`,
+appends it to `commit.md`, and requests review N+1. Never amend the reviewed
+commit. Continue until passed or blocked.
 
-Sol consumes the coding worker's completed implementation and self-test report
-together with completed independent `luna_runner` evidence. For a staged simple
-task, the packet also identifies the initial Sol source-edit stage. Sol inspects
-the source implementation and performs the patch-correctness and
-capability-reuse audit passes; it does not perform a test-code quality audit on
-Luna-owned test files. It writes
-`task-M-code-review-N.md` plus the required
-`task-M-code-review-N-retrospective.md` when changes are required. Sol does not
-execute verification commands.
+For `passed`, the review commit also records the final verdict in `commit.md`
+and finalizes status. This is the task's single finalization/ledger commit; do
+not create another final-ledger commit.
 
-Do not start or finalize a Sol review until the dispatcher has supplied the
-completed independent `luna_runner` evidence. If that evidence is missing,
-interrupted, or still running, Sol reports that it is waiting and writes no
-immutable review artifact or verdict. Sol may inspect source, diffs, history,
-existing logs, and non-mutating Git scope evidence while waiting, but it may
-not execute the missing acceptance commands itself. If a review contract
-conflicts with this boundary, Sol follows this rule and reports the contract
-error to the dispatcher.
+## Verify independently only when warranted
 
-The dispatcher must forward the runner-authored evidence packet to Sol without
-replacing it with a dispatcher-written summary. The packet must identify the
-runner, each command, completion or interruption state, exact exit status and
-test counts, raw status/diff outputs, and generated artifacts. It must contain
-no runner-authored code-audit conclusion. Dispatcher claims that checks passed,
-even when numerically detailed, do not satisfy this gate.
-If the runner-authored packet is absent, Sol remains waiting and writes no
-review artifact or verdict.
+Do not start `luna_runner` automatically after coding self-tests. Coding-worker
+evidence is trusted unless concrete risk or inconsistency requires an
+independent run. Sol or the user may require verification when:
 
-For `changes_required`, do not send rework immediately. Sol must first complete
-the retrospective and make the routing decision:
+- the coding worker was interrupted or returned incomplete evidence;
+- reported results conflict with the diff, tests, or repository state;
+- a failure needs independent reproduction;
+- the task explicitly marks a high-risk transaction, concurrency, security, or
+  destructive boundary;
+- final initiative or release acceptance requires an independent full run;
+- the user explicitly asks for it.
 
-1. Write `task-M-code-review-N-retrospective.md` beside the triggering review.
-2. Explain which initial design, task contract, invariant, evidence gate, or
-   skill rule failed to prevent each finding and cite exact evidence.
-3. Decide the smallest recurrence-prevention correction and whether it belongs
-   in implementation, `plan.md`, `task-M.md`, verification, or this local skill.
-4. Put coder-visible findings and corrections only in
-   `task-M-code-review-N.md`. The retrospective is for future Sol reasoning and
-   human audit; do not send it to Luna workers or runners.
-5. Decide whether a reusable local-skill gap exists. If no, write no skill
-   artifact and do not modify the skill.
-6. If yes, first write `task-M-code-review-N-skill-change-spec.md` with the exact
-   rule, target section, scope, invariants, and acceptance criteria. Then update
-   `.codex/skills/local-workflow/SKILL.md` solely from that specification and verify
-   specification-to-diff conformance.
-7. Return a Sol-authored routing decision containing the coder review path,
-   any revised task/plan paths, the retrospective path, any skill-change
-   specification and conforming skill diff, and the next required worker.
+Run only the focused acceptance checks needed for that risk plus the appropriate
+full suite. Do not mechanically duplicate every coding fixture by default. The
+runner returns raw commands, exits, counts, status, diff, interruption state,
+and generated artifacts. It does not edit or provide a code-review verdict.
 
-After Sol completes those decisions and writes, the dispatcher performs only
-identity, permission, and declared-scope checks, forwards the coder-facing
-review unchanged, repeats both test layers as Sol directed, increments N, and
-requests another review. Continue until Sol returns `passed` unless the user
-explicitly overrides the gate.
+If optional verification fails, Sol decides the correction, Luna implements and
+self-tests it, the dispatcher commits a new review correction, and Sol reviews
+that commit.
 
-## Select Sol continuity
+## Continue and complete
 
-On `passed`, require Sol to select the next eligible task K and return:
+After a passed review commit, Sol selects the next eligible task and chooses
+`reuse`, `fresh`, or `none`. Reuse Sol when architecture and constraints are
+materially shared; use fresh context when the owned domain changes or retained
+context would add noise. Before a fresh Sol, collect only the mechanical facts
+it needs.
 
-```text
-Next Task: task-K | none
-Next Sol: reuse | fresh | none
-Reason: concise justification
-Evidence Focus: required only for fresh
-```
-
-Choose `reuse` when decisive code, constraints, assumptions, or migration
-context are materially shared. Choose `fresh` when the task is weakly related,
-changes owned area or domain, or retained context would add noise. Choose
-`none` when the plan is complete or no task is eligible.
-
-The dispatcher executes Sol's choice because a child cannot spawn itself. It
-must not substitute a different technical or continuity decision. Stop and
-return to Sol or the user only for runtime impossibility, safety, missing
-authority, explicit user instruction, or repository facts that invalidate the
-decision; record the reason.
-
-Before a fresh Sol spawn, have `luna_runner` perform only a mechanical current
-repository scan using the Evidence Focus: HEAD, worktree, file names, and
-available logs/command output. Then spawn fresh Sol with `fork_turns = "none"`,
-`plan.md`, task K, and that raw packet. Sol must read the applicable
-instructions, design documents, prerequisites, source, tests, and unresolved
-questions itself. Do not substitute the old Sol summary for the refresh.
-
-## Commit every passed task
-
-When a retrospective occurred, Sol's accepted workflow change set includes its
-`task-M-code-review-N-retrospective.md` artifact. If and only if Sol decided the
-skill requires a reusable correction, it also includes
-`task-M-code-review-N-skill-change-spec.md` and the conforming
-`.codex/skills/local-workflow/SKILL.md` correction. Keep those paths distinct from
-product implementation paths, verify both scopes explicitly, and never stage
-an unrelated skill or source change.
-
-After review passes and before following the continuity decision, the
-dispatcher commits task M itself:
-
-1. Compare `git status --short` with declared tracked, untracked, and deletion
-   scope; stop on mismatch.
-2. Confirm all deletions were explicitly authorized.
-3. Stage explicit task paths only; never use a broad add.
-4. Run `git diff --cached --check`.
-5. Verify `git diff --cached --name-only` exactly matches the accepted change
-   set.
-6. Commit with the accepted subject and collect the real exit status.
-7. Record hash, subject, and final `git status --short` in durable status.
-
-Coding, runner, and Sol workers do not commit. If the commit fails, stop and do
-not reuse or spawn Sol for task K. After a successful commit, execute
-`reuse`/`fresh`/`none` and continue.
-
-Keep every skill update scoped to this repository-local skill; do not modify the
-shared/global project-workflow skill. The code review and retrospective are
-mandatory for every `changes_required` verdict. The skill-change specification
-and local-skill modification are conditional on Sol's explicit reusable
-skill-gap decision.
+The dispatcher executes the continuity decision after the passed review commit.
+Stop for missing authority, real specification conflict, unsafe scope, or
+repository facts that invalidate the plan. Mark the initiative complete only
+when every non-superseded task has a passed review, all code commits are indexed,
+status names no blocker, and the final worktree contains no unexpected task
+artifact.
