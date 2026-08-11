@@ -9,12 +9,12 @@
 
 ## Current phase
 
-- Phase: `reviewing`
+- Phase: `planning`
 - Active plan: `plan-2.md`
 - Draft plan: `none`
-- Current task: `task-13`
-- Implementation stage: task-13 review 1 evidence reconciliation
-- Next action: commit the task-13 contract/review/evidence record, then redispatch Sol for review 2.
+- Current task: `task-14`
+- Implementation stage: task-13 passed review 2; final workflow record pending commit
+- Next action: commit task-13 review 2 and ledger, then dispatch Sol to write and accept task-14.
 
 ## Repository snapshot
 

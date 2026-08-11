@@ -24,3 +24,10 @@
 - Initial implementation: `a885f8d` `feat: complete local reltree project reports`
 - Independent verification: passed; compile, EUnit 138/0, CT 6/0, escriptize, focused task-12 tests 87/0
 - Review 1: passed; see `task-12-code-review-1.md`
+
+## plan-2 / task-13
+
+- Initial implementation: `66040b9` `refactor: converge reltree local gates`
+- Review 1: `changes_required` only for missing persisted verification evidence; no product finding
+- Evidence record: `3ed8467` `docs: record task-13 verification evidence`
+- Review 2: passed; see `task-13-code-review-2.md`
