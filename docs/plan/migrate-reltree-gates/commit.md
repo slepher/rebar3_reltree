@@ -6,3 +6,8 @@
 - Review 1: `changes_required`; direct version-continuity assertions pending
 - Review 1 correction: `bfd3c04` `fix: task-5 review 1 version continuity assertions`
 - Final verdict: passed at review 2
+
+## plan-2 / task-10
+
+- Initial implementation: `b272304` `Converge reltree installer and packaging`
+- Review 1: `changes_required`; see `task-10-code-review-1.md`

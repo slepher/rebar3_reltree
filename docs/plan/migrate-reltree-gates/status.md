@@ -9,12 +9,12 @@
 
 ## Current phase
 
-- Phase: `plan_review`
-- Active plan: `plan-1.md`
-- Draft plan: `plan-2.md`
-- Current task: `none`
-- Implementation stage: user review of replacement plan draft
-- Next action: obtain explicit user approval or requested corrections for `plan-2.md`; do not dispatch coding before approval.
+- Phase: `rework`
+- Active plan: `plan-2.md`
+- Draft plan: `none`
+- Current task: `task-10`
+- Implementation stage: task-10 review 1 recorded `changes_required`
+- Next action: revise task-10 acceptance text with Sol, then dispatch Luna for the five bounded review corrections and self-tests.
 
 ## Repository snapshot
 
