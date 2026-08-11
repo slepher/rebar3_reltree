@@ -3,12 +3,13 @@
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
--export([all/0, provider_and_cli_surface/1, deep_relationship_closure/1,
-         anomaly_and_atomic_boundary/1, status_and_report_facts/1,
-         bgate_surface/1]).
+-export([all/0, provider_and_cli_surface/1, active_profile_and_scan_boundary/1,
+         deep_relationship_closure/1, anomaly_and_atomic_boundary/1,
+         status_and_report_facts/1, bgate_surface/1]).
 
 all() ->
-    [provider_and_cli_surface, deep_relationship_closure,
+    [provider_and_cli_surface, active_profile_and_scan_boundary,
+     deep_relationship_closure,
      anomaly_and_atomic_boundary, status_and_report_facts, bgate_surface].
 
 provider_and_cli_surface(_Config) ->
@@ -40,6 +41,41 @@ provider_and_cli_surface(_Config) ->
     after
         %% The first root may already have been cleaned before the CLI branch.
         rebar3_reltree_fixtures:cleanup(Root)
+    end.
+
+active_profile_and_scan_boundary(_Config) ->
+    Root = rebar3_reltree_fixtures:new_root(),
+    ScanTarget = rebar3_reltree_fixtures:new_root(),
+    try
+        rebar3_reltree_fixtures:write_project(Root, ct_profile, [], "0.1.0"),
+        State0 = rebar_state:new([{reltree, [{scan_roots, []}]}]),
+        State1 = rebar_state:dir(State0, Root),
+        State2 = rebar_state:current_profiles(State1, [default, test]),
+        State3 = rebar_state:command_args(State2, ["tree"]),
+        {ok, State3} = rebar3_reltree_prv_tree:do(State3),
+        ActiveOutput = filename:join([Root, "_build", "test", "reltree",
+                                      "project.md"]),
+        DefaultOutput = filename:join([Root, "_build", "default", "reltree",
+                                       "project.md"]),
+        ?assert(filelib:is_regular(ActiveOutput)),
+        ?assertNot(filelib:is_regular(DefaultOutput)),
+
+        Link = filename:join(Root, "scan-link"),
+        ok = file:make_symlink(ScanTarget, Link),
+        {Catalog, Warnings} = rebar3_reltree_scan:catalog(
+                                Root, [{Root, deep}]),
+        ?assert(maps:is_key(rebar3_reltree_fs:canonical(Root), Catalog)),
+        ?assertNot(maps:is_key(rebar3_reltree_fs:canonical(ScanTarget),
+                               Catalog)),
+        ?assert(lists:any(
+                  fun(#{path := Path, reason := scan_entry_skipped,
+                        detail := symlink}) ->
+                          Path =:= rebar3_reltree_fs:canonical(Link);
+                     (_) -> false
+                  end, Warnings))
+    after
+        rebar3_reltree_fixtures:cleanup(Root),
+        rebar3_reltree_fixtures:cleanup(ScanTarget)
     end.
 
 deep_relationship_closure(_Config) ->

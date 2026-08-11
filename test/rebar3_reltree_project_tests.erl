@@ -23,9 +23,55 @@ complete_local_report_contains_required_facts_test() ->
         ?assert(string:str(Text, "app_src: ") > 0),
         ?assert(string:str(Text, "project_plugins") > 0),
         ?assert(string:str(Text, "plugins") > 0),
+        ?assert(string:str(Text, "git_head: ") > 0),
+        ?assert(string:str(Text, "highest_formal_version: none") > 0),
+        ?assert(string:str(Text, "README.md: absent") > 0),
+        ?assert(string:str(Text, "ci_workflow: absent") > 0),
         ?assert(string:str(Text, "revision_state: not-applicable") > 0),
         ?assert(string:str(Text, "network_sync_at: not-performed") > 0),
         ?assert(string:str(Text, "status: up-to-date") > 0)
+    after
+        rebar3_reltree_fixtures:cleanup(Workspace)
+    end.
+
+complete_local_relationship_report_and_external_omission_test() ->
+    Workspace = rebar3_reltree_fixtures:new_root(),
+    try
+        Current = filename:join(Workspace, "current"),
+        Upstream = filename:join(Workspace, "upstream"),
+        Transitive = filename:join(Workspace, "transitive"),
+        Downstream = filename:join(Workspace, "downstream"),
+        lists:foreach(fun file:make_dir/1,
+                      [Current, Upstream, Transitive, Downstream]),
+        rebar3_reltree_fixtures:write_project(
+          Current, current, [upstream, external], "0.1.0"),
+        rebar3_reltree_fixtures:write_project(
+          Upstream, upstream, [transitive], "0.1.0"),
+        rebar3_reltree_fixtures:write_project(Transitive, transitive, [],
+                                              "0.1.0"),
+        rebar3_reltree_fixtures:write_project(Downstream, downstream,
+                                              [current], "0.1.0"),
+        rebar3_reltree_fixtures:checkout(Current, upstream, Upstream),
+        rebar3_reltree_fixtures:checkout(Upstream, transitive, Transitive),
+        rebar3_reltree_fixtures:checkout(Downstream, current, Current),
+        Request = request(Current, [{Workspace, deep}], default),
+        {ok, Result} = rebar3_reltree_project:generate(
+                         Request, #{clock => fixed_clock()}),
+        Model = maps:get(model, Result),
+        ?assertEqual(4, length(maps:get(nodes, Model))),
+        ?assertEqual(3, length(maps:get(edges, Model))),
+        ?assertEqual(up_to_date, maps:get(status, Model)),
+        Text = binary_to_list(maps:get(bytes, Result)),
+        ?assertEqual(4, count(Text, "### node:")),
+        ?assert(string:str(Text, "### node: upstream") > 0),
+        ?assert(string:str(Text, "### node: downstream") > 0),
+        ?assert(string:str(Text, "dependency: upstream") > 0),
+        ?assert(string:str(Text, "dependency: current") > 0),
+        ?assert(string:str(Text, "dependency: transitive") > 0),
+        ?assert(string:str(Text,
+                           "name: external; declaration: external; relationship: external") > 0),
+        ?assertEqual(0, string:str(Text, "### node: external")),
+        ?assertEqual(0, string:str(Text, "reason: external"))
     after
         rebar3_reltree_fixtures:cleanup(Workspace)
     end.
@@ -173,6 +219,26 @@ generation_failure_preserves_prior_report_and_temp_boundary_test() ->
         rebar3_reltree_fixtures:cleanup(Workspace)
     end.
 
+current_project_failure_preserves_prior_report_test() ->
+    Workspace = rebar3_reltree_fixtures:new_root(),
+    try
+        rebar3_reltree_fixtures:write_project(Workspace, current, [],
+                                              "0.1.0"),
+        Request = request(Workspace, [], default),
+        {ok, First} = rebar3_reltree_project:generate(
+                        Request, #{clock => fixed_clock()}),
+        Prior = maps:get(bytes, First),
+        rebar3_reltree_fixtures:write_file(
+          filename:join(Workspace, "rebar.config"), "{deps, [} .\n"),
+        ?assertMatch({error, {current_project, _, _}},
+                     rebar3_reltree_project:generate(Request)),
+        {ok, Current} = file:read_file(maps:get(output_path, Request)),
+        ?assertEqual(Prior, Current),
+        ?assertEqual([], temp_files(maps:get(output_path, Request)))
+    after
+        rebar3_reltree_fixtures:cleanup(Workspace)
+    end.
+
 connected_candidate_missing_required_facts_is_omitted_test() ->
     Workspace = rebar3_reltree_fixtures:new_root(),
     try
@@ -209,6 +275,50 @@ profile_specific_reports_do_not_share_output_path_test() ->
                         maps:get(output_path, Test)),
         ?assert(filelib:is_regular(maps:get(output_path, DefaultResult))),
         ?assert(filelib:is_regular(maps:get(output_path, TestResult)))
+    after
+        rebar3_reltree_fixtures:cleanup(Workspace)
+    end.
+
+revision_modes_are_read_only_and_share_identity_test() ->
+    Workspace = rebar3_reltree_fixtures:new_root(),
+    try
+        rebar3_reltree_fixtures:write_project(
+          Workspace, current,
+          [{external, {git, "file:///external"}},
+           {external, {git, "file:///external"}}], "0.1.0"),
+        Request = request(Workspace, [], default),
+        Lookup = fun(_Url, _Selector) ->
+                         put(task12_lookup_count, lookup_count() + 1),
+                         {ok, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+                 end,
+        Snapshot = local_snapshot(Workspace),
+        erase(task12_lookup_count),
+        {ok, Disabled} = rebar3_reltree_project:generate(
+                           Request#{rev => false},
+                           #{clock => fixed_clock(), lookup => Lookup}),
+        ?assertEqual(0, lookup_count()),
+        ?assertMatch({_, _}, binary:match(maps:get(bytes, Disabled),
+                                          <<"revision_state: tracking-disabled">>)),
+
+        erase(task12_lookup_count),
+        {ok, Resolved} = rebar3_reltree_project:generate(
+                           Request#{rev => true},
+                           #{clock => fixed_clock(), lookup => Lookup}),
+        ?assertEqual(1, lookup_count()),
+        ?assertMatch({_, _}, binary:match(maps:get(bytes, Resolved),
+                                          <<"revision_state: resolved">>)),
+        ?assertEqual(nomatch,
+                     binary:match(maps:get(bytes, Resolved),
+                                  <<"network_sync_at: not-performed">>)),
+        ?assertEqual(Snapshot, local_snapshot(Workspace)),
+
+        erase(task12_lookup_count),
+        {ok, Reused} = rebar3_reltree_project:generate(
+                         Request#{rev => auto},
+                         #{clock => later_clock(), lookup => Lookup}),
+        ?assertEqual(0, lookup_count()),
+        ?assertMatch({_, _}, binary:match(maps:get(bytes, Reused),
+                                          <<"revision_state: reused">>))
     after
         rebar3_reltree_fixtures:cleanup(Workspace)
     end.
@@ -250,3 +360,21 @@ temp_files(Output) ->
     {ok, Names} = file:list_dir(filename:dirname(Output)),
     [Name || Name <- Names,
              lists:prefix(".project.md.reltree-", Name)].
+
+lookup_count() ->
+    case get(task12_lookup_count) of
+        undefined -> 0;
+        Count -> Count
+    end.
+
+local_snapshot(Root) ->
+    {ok, Config} = file:read_file(filename:join(Root, "rebar.config")),
+    {ok, AppSrc} = file:read_file(filename:join([Root, "src", "current.app.src"])),
+    Readme = file:read_file(filename:join(Root, "README.md")),
+    ReadmeZh = file:read_file(filename:join(Root, "README.zh.md")),
+    Checkout = case file:list_dir(filename:join(Root, "_checkouts")) of
+                   {ok, Names} -> lists:sort(Names);
+                   {error, enoent} -> none
+               end,
+    {ok, Git} = rebar3_reltree_git:read(Root),
+    {Config, AppSrc, Readme, ReadmeZh, Checkout, Git}.

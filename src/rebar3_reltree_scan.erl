@@ -110,7 +110,14 @@ scan_children(Parent, [Name | Rest], Mode, State0) ->
                                      State0
                              end;
                          false ->
-                             State0
+                             case rebar3_reltree_fs:identity(Child) of
+                                 {error, {not_directory, symlink}} ->
+                                     add_warning(
+                                       warning(Child, scan_entry_skipped,
+                                               symlink), State0);
+                                 _ ->
+                                     State0
+                             end
                      end
              end,
     scan_children(Parent, Rest, Mode, State1).
