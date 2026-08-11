@@ -18,3 +18,9 @@
 - Review 1: `changes_required`; see `task-10-code-review-1.md`
 - Review 1 correction: `49f5632` `fix: task-10 review 1 correction`
 - Final verdict: passed at review 2
+
+## plan-2 / task-12
+
+- Initial implementation: `a885f8d` `feat: complete local reltree project reports`
+- Independent verification: passed; compile, EUnit 138/0, CT 6/0, escriptize, focused task-12 tests 87/0
+- Review 1: passed; see `task-12-code-review-1.md`

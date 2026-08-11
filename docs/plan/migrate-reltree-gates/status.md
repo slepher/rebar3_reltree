@@ -9,12 +9,12 @@
 
 ## Current phase
 
-- Phase: `task_planning`
+- Phase: `planning`
 - Active plan: `plan-2.md`
 - Draft plan: `none`
-- Current task: `task-12`
-- Implementation stage: task-11 passed review 1; continuing to the accepted tree/report task
-- Next action: dispatch fresh Sol to write the exact task-12 implementation contract.
+- Current task: `task-13`
+- Implementation stage: task-12 passed review 1; workflow artifacts pending commit
+- Next action: commit task-12 workflow artifacts, then dispatch Sol to write and accept task-13.
 
 ## Repository snapshot
 
