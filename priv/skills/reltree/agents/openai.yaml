@@ -1,4 +1,4 @@
 interface:
   display_name: "Reltree"
-  short_description: "Install the packaged reltree skill"
-  default_prompt: "Run reltree with no arguments to install this packaged skill locally."
+  short_description: "Guide local reltree releases"
+  default_prompt: "Read the target repository's current release.md and follow the packaged reltree release guidance."
