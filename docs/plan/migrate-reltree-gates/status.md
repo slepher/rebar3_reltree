@@ -9,12 +9,12 @@
 
 ## Current phase
 
-- Phase: `planning`
+- Phase: `reviewing`
 - Active plan: `plan-2.md`
 - Draft plan: `none`
 - Current task: `task-13`
-- Implementation stage: task-12 passed review 1; workflow artifacts pending commit
-- Next action: commit task-12 workflow artifacts, then dispatch Sol to write and accept task-13.
+- Implementation stage: task-13 review 1 evidence reconciliation
+- Next action: commit the task-13 contract/review/evidence record, then redispatch Sol for review 2.
 
 ## Repository snapshot
 
@@ -136,5 +136,15 @@
   before the planned badge and skill tasks.
 
 ## Blocker
+
+- Task-13 review 1 returned `changes_required` only because the required verification packet was not
+  recorded in initiative status before review; static review found no product defect or scope leakage.
+- Task-13 coding self-tests: compile 0; version EUnit 8/0; checkvsn EUnit 6/0; badge EUnit 15/0;
+  provider EUnit 14/0; full EUnit 140/0; CT 6/0; escriptize 0; diff check 0. Owned product scope
+  was exactly `src/rebar3_reltree_badge.erl` and `test/rebar3_reltree_badge_tests.erl`.
+- Independent runner on `66040b9`: repeated compile, focused suites, full EUnit 140/0, CT 6/0,
+  escriptize, and diff check all passed; version/checkvsn/bgate matrices and no-write snapshots
+  passed; root README/workflow, refs, tree/report, installer and skill paths were unchanged; build
+  artifacts were cleaned. Only non-fatal pre-1980 timestamp warnings appeared during escriptize.
 
 - None. task-6 is superseded before completion with attributable partial work; task-9 planning is active.
