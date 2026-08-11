@@ -9,12 +9,12 @@
 
 ## Current phase
 
-- Phase: `planning`
+- Phase: `completed`
 - Active plan: `plan-2.md`
 - Draft plan: `none`
-- Current task: `task-14`
-- Implementation stage: task-13 passed review 2; final workflow record pending commit
-- Next action: commit task-13 review 2 and ledger, then dispatch Sol to write and accept task-14.
+- Current task: `none`
+- Implementation stage: task-14 passed review 1; initiative complete
+- Next action: commit the final workflow ledger/review record and verify a clean worktree.
 
 ## Repository snapshot
 
@@ -148,3 +148,15 @@
   artifacts were cleaned. Only non-fatal pre-1980 timestamp warnings appeared during escriptize.
 
 - None. task-6 is superseded before completion with attributable partial work; task-9 planning is active.
+
+- Task-14 dispatcher self-tests: focused CLI/installer EUnit 10/0; escriptize 0 with only non-fatal
+  pre-1980 timestamp warnings; archive subtree has exactly `SKILL.md` and `agents/openai.yaml`,
+  and both extracted bytes match source; isolated bare install, default conflict, `--dest`, and
+  `--force` checks passed. Static checks found required install/release/cleanup guidance and no
+  historical install alias or third package resource; no runtime, README, workflow, ref, or report
+  mutation occurred.
+- Independent task-14 runner: CLI EUnit 10/0; installer EUnit 10/0; escriptize 0; archive contained
+  exactly the two resources with byte equality; isolated bare, `--dest`, conflict, and `--force`
+  installs passed; static positive/negative checks and diff check passed; temporary fixtures cleaned.
+  The runner noted only the normal 99-byte self-extracting archive prefix warning and an asdf shebang
+  mismatch; invoking the generated escript with the installed OTP escript passed.

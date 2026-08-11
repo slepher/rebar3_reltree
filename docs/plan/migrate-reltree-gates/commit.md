@@ -31,3 +31,9 @@
 - Review 1: `changes_required` only for missing persisted verification evidence; no product finding
 - Evidence record: `3ed8467` `docs: record task-13 verification evidence`
 - Review 2: passed; see `task-13-code-review-2.md`
+
+## plan-2 / task-14
+
+- Initial implementation: `51f80f6` `docs: complete packaged reltree release guidance`
+- Independent verification: passed; focused CLI/installer EUnit 10/0 each, archive/install matrix passed
+- Review 1: passed; see `task-14-code-review-1.md`
