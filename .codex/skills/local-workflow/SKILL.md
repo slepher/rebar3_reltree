@@ -1,6 +1,6 @@
 ---
 name: local-workflow
-description: Execute or resume repository initiatives through durable plan.md, status.md, and commit.md artifacts, with Sol planning and reviewing small tasks, Luna implementing and self-testing, optional risk-triggered independent verification, and the dispatcher owning recovery, status, staging, and commits. Use for multi-task project work, interruption recovery, one-task-at-a-time implementation, review correction commits, and auditable code history. Use $delegate for all worker routing.
+description: Execute or resume repository initiatives through versioned plan-N.md files plus durable status.md and commit.md artifacts, with Sol planning and reviewing small tasks, Luna implementing and self-testing, optional risk-triggered independent verification, and the dispatcher owning recovery, status, staging, and commits. Use for multi-task project work, interruption recovery, one-task-at-a-time implementation, review correction commits, design-plan revisions, and auditable code history. Use $delegate for all worker routing.
 ---
 
 # Local Workflow
@@ -16,8 +16,10 @@ repository initiative, normally `docs/plan/<Goal>/`. Before reading workflow
 artifacts:
 
 1. Select only the requested Goal's initiative.
-2. Read its `plan.md`, `status.md`, `commit.md` when present, current task, and
-   current review artifacts.
+2. Read `status.md` first. Follow its exact `Active plan: plan-N.md | none` and
+   optional `Draft plan: plan-N.md | none` references, then read the applicable
+   plan, `commit.md` when present, the current task, and current reviews. Never
+   select a plan by recency or content guess.
 3. Read specifications named by the user, referenced by the task, or required
    by repository instructions. Do not infer an OpenSpec path from the Goal.
 4. If the directory is absent, create the initiative. If its contents describe
@@ -33,7 +35,7 @@ exclude unrelated plans and specifications.
 Sol owns substantive decisions:
 
 - requirement reconciliation and architecture;
-- `plan.md`, task selection, and task contracts;
+- versioned `plan-N.md` files, task selection, and task contracts;
 - file ownership, reuse decisions, data shapes, pseudocode, and stop conditions;
 - code review verdicts and coder-facing corrections;
 - deciding whether an unfinished task is too broad and revising the plan;
@@ -70,10 +72,11 @@ does not replace worker-authored evidence with its own technical conclusion.
 
 Keep these initiative artifacts:
 
-- `plan.md`: Goal, normative inputs, constraints, dependencies, ordered small
-  tasks, and `Plan status: draft | accepted`;
-- `status.md`: current repository snapshot, task, phase, evidence, blocker, and
-  one exact next action;
+- `plan-N.md`: one numbered design generation containing Goal, lineage,
+  normative inputs, constraints, dependencies, ordered small tasks, and
+  `Plan status: draft | accepted`;
+- `status.md`: current repository snapshot, task, phase, evidence, blocker,
+  exact `Active plan`, optional `Draft plan`, and one exact next action;
 - `commit.md`: append-only index of code commits by task and review correction;
 - `task-M.md`: complete implementation contract for task M;
 - `task-M-code-review-N.md`: immutable Sol review decision;
@@ -83,17 +86,24 @@ Keep these initiative artifacts:
 The dispatcher writes `status.md` and `commit.md`; Sol writes plans, tasks, and
 reviews. Never overwrite or renumber an existing task or review artifact.
 
-Write `plan.md` in the primary language used by the user for the current Goal,
+Write every `plan-N.md` in the primary language used by the user for the Goal,
 or in an explicitly requested language. Keep code identifiers, commands, paths,
 and quoted specification terms exact. Do not translate historical artifacts
 merely for consistency during recovery.
+
+Number plans monotonically from `plan-1.md`. Keep earlier accepted plans as
+historical design records. `status.md` is the sole authority for the active
+plan; never maintain two active plans. For a legacy initiative containing only
+`plan.md`, the dispatcher may mechanically rename it to `plan-1.md` without
+changing its content, update status, and commit that migration before creating
+another design plan.
 
 `commit.md` exists for recovery and code-history inspection, not task
 execution. Do not send it to coding workers. Record only commits that change
 product source, tests, or implementation fixtures:
 
 ```markdown
-## task-M
+## plan-N / task-M
 
 - Initial implementation: <hash> <subject>
 - Review 1 correction: <hash> <subject>
@@ -130,7 +140,8 @@ commit hashes, and one executable next action. Child IDs are hints only.
 On every continuation, and whenever status conflicts with the worktree, enter
 recovery before dispatch:
 
-1. Read the selected plan, status, commit ledger, current task, and reviews.
+1. Read status, its exact active or draft `plan-N.md` for the recorded phase,
+   the commit ledger, current task, and reviews.
 2. Inspect HEAD, `git status --short`, real diffs, untracked files, and expected
    task paths. Git and immutable artifacts override stale status prose.
 3. Ask `luna_runner` for missing mechanical facts only when needed.
@@ -154,26 +165,34 @@ Do not redispatch an apparently unstarted task when attributable implementation
 already exists. Do not discard partial work, rerun completed gates without an
 invalidation reason, or modify completed tasks to repair checkpoint prose.
 
-## Require user approval for the plan
+## Require user approval for each design plan
 
-Before creating a formal plan, have Sol write `plan.md` as `Plan status: draft`
-in the user's language. The dispatcher then:
+Before creating a formal design plan, have Sol write the next `plan-N.md` as
+`Plan status: draft` in the user's language. When an earlier plan exists, state
+`Supersedes: plan-K.md` and the last materialized task. If the prior plan has an
+unfinished materialized task M, begin the new plan at task M+1; otherwise begin
+after the highest materialized task. Ignore unmaterialized future proposals in
+the old plan when choosing the next number. Preserve task M and its artifacts as
+history, and assign any usable attributable partial work to the first new task.
+The dispatcher then:
 
-1. sets status to `plan_review` with no current implementation task;
+1. sets `Draft plan: plan-N.md`, enters `plan_review`, and sets no current
+   implementation task; retain the prior `Active plan` until approval;
 2. presents the draft plan and its task boundaries to the user;
 3. stops without writing a task contract, dispatching coding, or treating the
    plan as accepted.
 
 Proceed only after the user explicitly approves the draft. If the user requests
 changes, return them to Sol, revise the draft, and repeat the review pause. On
-approval, have Sol change only the plan status and approved corrections to
-`accepted`; then let the dispatcher enter `task_planning`.
+approval, have Sol change only that plan's status and approved corrections to
+`accepted`; then set `Active plan: plan-N.md`, clear `Draft plan`, and let the
+dispatcher enter `task_planning`.
 
-Return a material plan revision to `draft` before affected work starts. Adding,
-removing, splitting, merging, reordering, or changing the behavior of unfinished
-tasks is material and requires another user review pause. Recovery-only status
-reconciliation and coder-facing review corrections do not reopen an otherwise
-unchanged accepted plan.
+Create `plan-(N+1).md` only for a material product-design or requirement change:
+changed scope, public behavior, interface, acceptance semantics, or normative
+authority. Pause again for user review before activating it. Recovery-only
+status reconciliation, coder-facing review corrections, and behavior-preserving
+task decomposition do not create a new plan.
 
 ## Plan small tasks
 
@@ -199,24 +218,28 @@ broad task. A task is too broad when it has multiple independently acceptable
 behaviors, needs an intermediate review before later work is safe, combines
 several complex responsibilities, needs separate test matrices, or cannot fit
 in one coding worker's coherent context. When this occurs before coding, split
-it in `plan.md` before dispatch.
+it directly in the active `plan-N.md` before dispatch. If the split preserves
+accepted behavior and scope, it is task refinement, not a new design plan.
 
 ### Split an unfinished broad task
 
-Completed, passed tasks are immutable. Sol may freely replace a not-started
-broad task in `plan.md` with smaller tasks.
+Completed, passed tasks are immutable. Sol may directly replace a not-started
+broad task in the active plan with smaller tasks without creating another plan,
+provided accepted behavior and scope remain unchanged.
 
 If coding has started but the task remains unfinished:
 
 1. Stop further implementation and recover the current diff.
 2. Have Sol identify the smallest complete behavior represented by existing
    work and the remaining independent behaviors.
-3. Revise `plan.md` to mark the old task `superseded before completion`, state
-   the reason and replacement task numbers, and assign existing work to the
-   first replacement task.
+3. Revise the active `plan-N.md` in place to mark the old task `superseded
+   before completion`, state the reason and replacement task numbers, and assign
+   existing work to the first replacement task. Keep `Active plan` unchanged.
 4. Preserve the old `task-M.md`; do not overwrite it or discard its diff.
-5. Create replacement tasks with the next monotonic integer numbers, not nested
-   stage identifiers.
+5. Create replacement tasks with the next unused monotonic integer numbers, not
+   nested stage identifiers. A task is materialized once it has a task artifact,
+   is current in status, has a code commit, or has a review; never reuse a
+   materialized task number.
 6. Implement, self-test, commit, and review each replacement independently.
 
 Ordered coding steps may exist inside one task, but they are not workflow
@@ -253,8 +276,9 @@ squash, or rewrite it to hide later review corrections.
 ## Review the committed code
 
 Sol formally reviews the fixed implementation commit, not a moving uncommitted
-diff. Give Sol the task contract, reviewed commit and diff, decisive source and
-test paths, coding self-test packet, and prior reviews. Sol performs semantic,
+diff. Give Sol the active plan identity, task contract, reviewed commit and
+diff, decisive source and test paths, coding self-test packet, and prior
+reviews. Sol performs semantic,
 architecture, assertion-meaning, scope, and capability-reuse review and writes
 exactly one verdict:
 
