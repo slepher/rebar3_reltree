@@ -7,6 +7,11 @@
 - Review 1 correction: `bfd3c04` `fix: task-5 review 1 version continuity assertions`
 - Final verdict: passed at review 2
 
+## plan-2 / task-11
+
+- Initial implementation: `f843f42` `refactor: remove historical reltree overdesign`
+- Final verdict: passed at review 1
+
 ## plan-2 / task-10
 
 - Initial implementation: `b272304` `Converge reltree installer and packaging`
