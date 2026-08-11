@@ -1,0 +1,99 @@
+#!/usr/bin/env escript
+%%! -noshell
+-mode(compile).
+
+-define(INSTALLER_MODULE, rebar3_reltree_skill_install).
+
+main(Args) ->
+    case parse(Args, #{force => false}) of
+        help ->
+            io:put_chars(help());
+        {error, Reason} ->
+            fail(2, Reason);
+        {ok, Options} ->
+            install(Options)
+    end.
+
+parse([], Options) ->
+    {ok, Options};
+parse(["--help"], _Options) ->
+    help;
+parse(["-h"], _Options) ->
+    help;
+parse(["--force" | Rest], #{force := false} = Options) ->
+    parse(Rest, Options#{force => true});
+parse(["--force" | _Rest], _Options) ->
+    {error, "option --force may be specified only once"};
+parse(["--dest"], _Options) ->
+    {error, "option --dest requires a value"};
+parse(["--dest", Value | Rest], Options) when Value =/= [] ->
+    case {maps:is_key(dest, Options), lists:prefix("--", Value)} of
+        {true, _} ->
+            {error, "option --dest may be specified only once"};
+        {false, true} ->
+            {error, "option --dest requires a value"};
+        {false, false} ->
+            parse(Rest, Options#{dest => Value})
+    end;
+parse(["--dest", [] | _Rest], _Options) ->
+    {error, "option --dest requires a non-empty value"};
+parse([Option | _Rest], _Options) when hd(Option) =:= $- ->
+    {error, ["unknown option ", io_lib:format("~p", [Option])]};
+parse([Argument | _Rest], _Options) ->
+    {error, ["unexpected argument ", io_lib:format("~p", [Argument])] }.
+
+install(Options) ->
+    Root = repository_root(),
+    Source = filename:join([Root, "priv", "skills", "reltree"]),
+    InstallerSource = filename:join([Root, "src",
+                                     "rebar3_reltree_skill_install.erl"]),
+    case load_installer(InstallerSource) of
+        ok ->
+            case ?INSTALLER_MODULE:resolve_destination(Options, fun os:getenv/1) of
+                {ok, Parent} ->
+                    case ?INSTALLER_MODULE:install(
+                           Source, Parent, maps:get(force, Options)) of
+                        {ok, Target} ->
+                            io:format("reltree skill installed at ~ts~n", [Target]);
+                        {error, Reason} ->
+                            fail(1, io_lib:format("install failed: ~p", [Reason]))
+                    end;
+                {error, Reason} ->
+                    fail(1, io_lib:format("destination unavailable: ~p", [Reason]))
+            end;
+        {error, Reason} ->
+            fail(1, io_lib:format("cannot load installer: ~p", [Reason]))
+    end.
+
+repository_root() ->
+    Script = filename:absname(escript:script_name()),
+    filename:dirname(filename:dirname(Script)).
+
+load_installer(Path) ->
+    case compile:file(Path, [binary, return_errors, return_warnings]) of
+        {ok, ?INSTALLER_MODULE, Binary} ->
+            load_binary(Path, Binary);
+        {ok, ?INSTALLER_MODULE, Binary, _Warnings} ->
+            load_binary(Path, Binary);
+        {error, Errors, Warnings} ->
+            {error, {compile, Errors, Warnings}};
+        error ->
+            {error, compile_failed}
+    end.
+
+load_binary(Path, Binary) ->
+    case code:load_binary(?INSTALLER_MODULE, Path, Binary) of
+        {module, ?INSTALLER_MODULE} -> ok;
+        {error, Reason} -> {error, {load, Reason}}
+    end.
+
+help() ->
+    ["Usage: scripts/install_reltree [--dest DIR] [--force]\n\n",
+     "Install the repository's packaged reltree skill.\n\n",
+     "Options:\n",
+     "  --dest DIR  install below DIR/reltree\n",
+     "  --force     replace an existing reltree skill\n"].
+
+fail(Status, Reason) ->
+    io:put_chars(standard_error, ["install_reltree: ", Reason, "\n"]),
+    halt(Status).

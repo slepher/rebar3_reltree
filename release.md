@@ -108,7 +108,7 @@
 
 ## 5. `reltree` skill 与用户级安装
 
-`rebar3_reltree` 同时发布 Rebar3 plugin 和安装 escript。Rebar3 plugin 提供项目树、
+`rebar3_reltree` 同时提供 Rebar3 plugin 和仓库内可直接执行的安装 escript。Rebar3 plugin 提供项目树、
 版本门禁和 badge 门禁命令；escript 只用于把本仓库维护的 `reltree` Codex skill 安装到
 用户级 skills 目录，不提供 `tree`、`checkvsn`、`bgate` 或其他项目管理命令。
 
@@ -122,10 +122,10 @@ priv/skills/reltree/
 
 skill 只包含自身工作流和 agent metadata，不打包发布规范副本，也不得创建额外 README。
 
-通过本项目生成的安装 escript 安装到用户级 Codex skills 目录：
+通过仓库内的安装 escript 安装到用户级 Codex skills 目录，无需先运行 `rebar3 escriptize`：
 
 ```bash
-reltree skill --install
+scripts/install_reltree
 ```
 
 安装规则：

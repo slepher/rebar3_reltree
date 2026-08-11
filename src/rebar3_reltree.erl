@@ -1,6 +1,6 @@
 -module(rebar3_reltree).
 
--export([init/1, main/1]).
+-export([init/1]).
 
 -spec init(term()) -> {ok, term()}.
 init(State) ->
@@ -34,7 +34,3 @@ init(State) ->
         {opts, rebar3_reltree_prv_checkvsn:option_spec()}
     ]),
     {ok, rebar_state:add_provider(State2, CheckVsnProvider)}.
-
--spec main([string()]) -> no_return().
-main(Args) ->
-    rebar3_reltree_cli:main(Args).

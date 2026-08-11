@@ -122,10 +122,8 @@ provider_help_is_local_to_adapters_test() ->
     BgateHelp = lists:flatten(rebar3_reltree_prv_bgate:help()),
     ?assert(string:str(TreeHelp, "--scan-roots") > 0),
     ?assert(string:str(BgateHelp, "--check") > 0),
-    {0, TopHelp0} = rebar3_reltree_cli:run(["--help"], #{}),
-    TopHelp = lists:flatten(TopHelp0),
-    ?assertEqual(0, string:str(TopHelp, "tree   inspect")),
-    ?assertEqual(0, string:str(TopHelp, "bgate  ")).
+    ?assertEqual(0, string:str(TreeHelp, "checkvsn")),
+    ?assertEqual(0, string:str(BgateHelp, "checkvsn")).
 
 provider_dispatches_valid_project_and_writes_report_test() ->
     Root = rebar3_reltree_fixtures:new_root(),
