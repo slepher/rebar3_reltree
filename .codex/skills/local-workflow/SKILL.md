@@ -5,15 +5,13 @@ description: Execute or resume repository initiatives through versioned plan-N.m
 
 # Local Workflow
 
-Run one small, independently implementable, testable, reviewable, and
-committable task at a time. Use `$delegate` for role selection, worker identity,
-permissions, and result verification.
+Run one independently implementable, testable, reviewable, committable task at
+a time. Use `$delegate` for worker routing, permissions, and result verification.
 
 ## Route the requested goal
 
 Treat the user's explicit Goal as authoritative. Resolve it only to the matching
-repository initiative, normally `docs/plan/<Goal>/`. Before reading workflow
-artifacts:
+initiative, normally `docs/plan/<Goal>/`. Before reading workflow artifacts:
 
 1. Select only the requested Goal's initiative.
 2. Read `status.md` first. Follow its exact `Active plan: plan-N.md | none` and
@@ -25,46 +23,19 @@ artifacts:
 4. If the directory is absent, create the initiative. If its contents describe
    another Goal, start a matching initiative instead of repurposing it.
 
-Repeat the exact Goal and normative inputs in delegated contracts. Explicitly
-exclude unrelated plans and specifications.
+Repeat the exact Goal and normative inputs in contracts; exclude unrelated plans
+and specifications.
 
 ## Isolate historical plans from current authority
 
-Treat the active normative specifications and the user's current decisions as
-the only sources of required product behavior. A superseded plan, prior task,
-review, retrospective, sibling implementation, or partial diff is historical
-evidence, not product authority. Its existence never carries an interface,
-command, architecture, edge case, test matrix, or acceptance strength into a
-new plan.
+Only active normative specifications and current user decisions define required
+product behavior. Prior artifacts, sibling code, and partial diffs are
+historical evidence, not product authority.
 
-When a specification changed after an earlier plan was written:
-
-1. derive the replacement plan from the current normative inputs before
-   consulting historical design detail;
-2. have the dispatcher or `luna_runner`, never Sol, extract only lineage, the
-   last actually selected task, completed commit boundaries, attributable
-   paths, and recoverable partial work;
-3. give Sol only that bounded historical-facts packet, never the old plan body
-   or its path as readable planning input;
-4. classify every proposed public surface, invariant, failure case, and
-   acceptance gate as `normative`, `necessary implementation constraint`, or
-   `historical only`;
-5. omit `historical only` items. Keep a necessary implementation constraint
-   only when current repository or platform evidence proves it is required to
-   implement a normative behavior; implementation convenience is not proof;
-6. record in the replacement plan a short `Historical isolation` summary that
-   names rejected old surfaces or requirements which could otherwise be
-   mistaken for current scope.
-
-Sol must not open, read, search, or receive a superseded plan, including legacy
-`plan.md`, while planning, revising a plan, defining a task, selecting
-continuity, or reviewing code. The dispatcher must explicitly list those paths
-as forbidden reads in every Sol contract. Do not send superseded plans or
-sibling defect lists to a coding worker either. Quote only the exact historical
-fact needed for the current decision and label it `historical evidence,
-non-normative`. Preserve attributable partial work physically during recovery,
-but reassess every hunk against the current accepted plan; preserved code does
-not preserve its old requirement.
+Before replacement planning or changed-specification recovery, read
+[references/historical-isolation.md](references/historical-isolation.md)
+completely. Forbid superseded plans and unrelated tasks; pass only exact facts
+labeled `historical evidence, non-normative`.
 
 ## Assign authority
 
@@ -81,66 +52,58 @@ Sol owns substantive decisions:
 - deciding whether independent verification is warranted;
 - selecting continuity to the next task.
 
-Sol is read-only for product source and tests unless a user-approved contract
-explicitly grants exact source paths. Sol never edits `status.md` or
-`commit.md`, stages, commits, delegates, or spawns children.
+Sol reads only granted product/test paths and writes only its exact workflow
+artifact. It never edits `status.md` or `commit.md`, stages, commits, delegates,
+or spawns children.
 
-Sol's workflow artifacts are written to the shared repository workspace, not
-only returned in the child conversation or an isolated private checkout. The
-dispatcher must give Sol the exact artifact path and write permission in the
-task contract, then verify that path and its `Plan status` on return. A prose
-summary without the required file is an incomplete planning result; the
-dispatcher must recover or re-route Sol and must not create the plan itself or
-ask the user to authorize dispatcher authorship.
+Sol writes workflow artifacts to the shared repository workspace, not only its
+conversation or a private checkout. Give it the exact path and write permission,
+then verify the artifact and `Plan status`. A prose-only result is incomplete;
+recover or re-route Sol rather than authoring the plan in the dispatcher.
 
-Sol does not run Git, build, test, lint, or other mechanical inspection
-commands while planning or reviewing. The dispatcher or `luna_runner` gathers
-those facts first and sends Sol a bounded evidence packet. Sol reasons from
-that packet and inspects only decisive files when needed; it must not turn a
-planning contract into a repository-wide audit.
+Sol does not run Git, build, test, lint, or mechanical inspection while planning
+or reviewing. The dispatcher or runner sends it a bounded evidence packet. Sol
+inspects only decisive files; it must not expand into a repository-wide audit.
 
-#### Read-access contract
+#### Role access contract
 
-Read access is separate from mechanical inspection. Every Sol contract must
-explicitly name all four of these fields:
+Every Sol, Luna coding-worker, and Luna runner contract must name:
 
-- `Allowed read paths`: exact normative, task, source, test, and evidence paths
-  Sol may open. A path listed here grants read access in the shared workspace;
-  the contract must not simultaneously say that all shell/file commands are
-  forbidden.
-- `Forbidden read paths`: every superseded plan, unrelated task contract, and
-  sibling artifact that must not be opened or searched. Use exact paths and
-  explicit `task-M.md` globs where applicable.
-- `Allowed read-only commands`: normally `sed`, `awk`, `rg`, and bounded file
-  existence/listing checks restricted to `Allowed read paths`. These commands
-  may inspect text and metadata but must not write, generate, or mutate files.
-- `Forbidden mechanical commands`: Git, build, test, lint, formatting, network,
-  or other commands reserved for the dispatcher or `luna_runner`.
+- `Allowed read paths` and `Forbidden read paths`;
+- `Allowed write paths` and `Forbidden write paths`;
+- `Allowed commands` and `Forbidden commands`.
 
-The same four fields are required in every Luna coding-worker and Luna runner
-contract, with the worker's exact task contract and owned source/test paths
-listed explicitly. A coding worker may read its current task contract and
-decisive repository files; a runner may read the bounded evidence paths needed
-for its specified commands. Neither receives broad initiative-directory read
-permission.
+Use exact paths and commands. Forbid superseded plans, unrelated tasks, and
+`task-M.md (M != N)`. Never grant broad initiative-directory access.
 
-The dispatcher must resolve permission contradictions before spawning a worker.
-In particular, `Allowed read paths` plus `Forbidden shell commands` is invalid
-when the worker has no non-shell file reader: permit bounded read-only commands
-instead. If a worker reports it cannot read a path that the contract already
-allows, reissue the contract with explicit read-only command permission before
-replanning, changing product scope, or marking the task blocked. If the needed
-path is outside the contract, the dispatcher or `luna_runner` must extract only
-the required fact and pass it as labeled evidence; the worker must not widen
-its own read scope.
+Apply these role capabilities:
+
+- Sol may use bounded text readers such as `sed`, `awk`, and `rg` on allowed
+  paths and write only the exact plan, task, or review artifact assigned to it.
+  Forbid Git, build, test, lint, formatting, network, product/test writes,
+  `status.md`, and `commit.md`.
+- A coding worker may write only task-owned product, test, fixture, config,
+  package, and documentation paths. Allow the exact build, test, lint, and
+  formatting commands named as Coding Self-Tests. Forbid workflow-artifact
+  writes, staging, commits, unrelated commands, and network unless separately
+  authorized.
+- A runner is read-only for repository content. Allow its exact inspection or
+  verification commands and only the generated/build or unique temporary paths
+  those commands require. Forbid source, test, workflow-artifact, staging, and
+  commit writes.
+
+Resolve contradictions before spawning. If an allowed path is unreadable
+because no reader was permitted, reissue the contract with a bounded reader.
+If a needed path is outside the contract, the dispatcher or runner extracts
+only the required fact; the worker never widens its own scope.
 
 ### Luna coding worker
 
-`luna_coding_worker` owns only the current task's exact product/test paths. It
-implements Sol's frozen behavior and blueprint, writes the required tests, runs
-every Coding Self-Test, fixes failures within scope, and returns the real diff
-and command evidence. It stops on an undecided behavior, unowned path, or
-contract conflict instead of making a product decision.
+`luna_coding_worker` owns only the current task's exact implementation, test,
+fixture, config, package, and related documentation paths. It implements Sol's
+frozen behavior and blueprint, writes required tests, runs every Coding
+Self-Test, fixes failures within scope, and returns real diff and command
+evidence. It stops on an undecided behavior, unowned path, or contract conflict.
 
 ### Luna runner
 
@@ -151,50 +114,21 @@ without editing code or judging architecture and assertion semantics.
 
 ### Dispatcher
 
-The dispatcher owns routing, worker identity and permission checks,
-`status.md`, `commit.md`, recovery coordination, scope checks, staging, and all
-Git commits. It forwards Sol decisions without technical reinterpretation and
-does not replace worker-authored evidence with its own technical conclusion.
+The dispatcher owns routing and permission checks, `status.md`, `commit.md`,
+recovery, scope checks, staging, and Git commits. It forwards Sol decisions and
+does not replace worker evidence with its own technical conclusion.
 
 ## Use only the permission the operation requires
 
-Task commits, tests, builds, static checks, and temporary verification do not
-inherently require a permission prompt. Before each command, resolve its exact
-operation, paths, external effects, and the current runtime's sandbox and
-approval rules:
+Follow `$delegate` and the current runtime's sandbox and approval rules. Run
+allowed operations directly, request approval for known restricted operations,
+and retry an unexpectedly blocked necessary operation only through the
+runtime's approval mechanism. Permission is an execution constraint, never an
+acceptance gate.
 
-- run it directly when the operation is allowed in the sandbox or is already
-  covered by a sufficiently narrow approval;
-- request approval before execution when the runtime already identifies the
-  exact operation as requiring it, including known restricted writes,
-  destructive operations, or other operations that the platform requires to
-  be approved in advance;
-- if an otherwise reasonable sandboxed attempt fails because of an unforeseen
-  permission, network, or external-service restriction, first narrow the
-  command and affected paths, then retry through the runtime's approval
-  mechanism when the operation remains necessary and in scope.
-
-Do not request approval merely because a command is a commit, test, build, or
-uses a command prefix without a pre-existing reusable approval rule. Conversely,
-do not deliberately run an operation that is already known to require approval
-just to obtain a failure. Permission prompts are execution constraints, never
-task acceptance gates.
-
-Keep verification commands and their effects bounded. Group related checks
-when that reduces repeated setup or prompts without hiding their individual
-commands, exits, or artifacts. Do not wrap validation in an unbounded shell
-command or clean a broad shared location. When temporary files are needed,
-create a unique task-scoped directory with `mktemp -d` using a project/task
-prefix, record the resolved path, operate only inside it, and remove only the
-artifacts created by that verification. A deterministic shared `/tmp` path is
-not safe across retries, recovery, or concurrent runs.
-
-If required verification remains blocked after the appropriate approval path
-is unavailable or the user declines it, record the exact command, paths,
-restriction, and missing evidence in `status.md` and stop at `blocked`. A
-bounded script for the user is a last-resort handoff, not a substitute for an
-available approval request; do not continue review or commit as though its
-missing result had passed.
+Before using temporary verification paths or handling a blocked approval, read
+and follow [references/execution-safety.md](references/execution-safety.md)
+completely.
 
 ## Persist only useful history
 
@@ -217,6 +151,13 @@ reviews. Never overwrite or renumber an existing task or review artifact.
 Renumbering during a split applies only to future plan entries that have not
 been materialized as artifacts or repository history.
 
+Create `status.md` from [assets/status-template.md](assets/status-template.md).
+After each durable boundary and before dispatch, review, or commit, run
+`python3 scripts/validate_workflow.py <initiative-directory>`. Treat validation
+failure as a checkpoint defect: repair dispatcher-owned status mechanically or
+return substantive artifact defects to Sol before continuing. This checks
+checkpoint structure and references, not code or completion evidence.
+
 Write every `plan-N.md` in the primary language used by the user for the Goal,
 or in an explicitly requested language. Keep code identifiers, commands, paths,
 and quoted specification terms exact. Do not translate historical artifacts
@@ -237,14 +178,16 @@ plan; never maintain two active plans. For a legacy initiative containing only
 changing its content, update status, and commit that migration before creating
 another design plan.
 
-`commit.md` exists for recovery and code-history inspection, not task
-execution. Do not send it to coding workers. Record only commits that change
-product source, tests, or implementation fixtures:
+`commit.md` exists for recovery and implementation-history inspection, not task
+execution. Do not send it to coding workers. Record task implementation commits
+that change code, tests, fixtures, config, package assets, or task-required
+documentation:
 
 ```markdown
 ## plan-N / task-M
 
 - Initial implementation: <hash> <subject>
+- Verification 1 correction: <hash> <subject>
 - Review 1 correction: <hash> <subject>
 - Review 2 correction: <hash> <subject>
 - Final verdict: passed at review N
@@ -254,6 +197,15 @@ Do not index workflow-only commits in `commit.md`. A commit cannot record its
 own hash. After a code commit, append its real hash and include that ledger
 update in the following review commit. The final passed-review commit includes
 the last code mapping; do not create a separate final-ledger commit.
+
+Code behavior and its required checks are the acceptance focus. Task-related
+documentation, config, package assets, and the accepted plan/task checkpoint may
+join the corresponding implementation commit when they are within declared
+scope; they never substitute for required code verification. Ensure an accepted
+plan and selected task contract are committed no later than the first
+implementation commit they govern. A workflow-only checkpoint commit is
+permitted when no code commit is imminent or recovery would otherwise depend on
+uncommitted artifacts, but do not index it in `commit.md`.
 
 For an existing initiative without `commit.md`, create it during recovery and
 reconstruct only code mappings supported by Git and immutable artifacts. Do not
@@ -267,6 +219,22 @@ Use one phase:
 planning | plan_review | task_planning | coding | coding_self_test | review |
 rework | optional_verification | committing | handoff | blocked | complete
 ```
+
+Use these normal transitions:
+
+```text
+planning -> plan_review -> task_planning -> coding -> coding_self_test
+coding_self_test -> committing -> optional_verification | review
+optional_verification -> review | rework
+review -> rework | handoff
+rework -> coding_self_test
+handoff -> task_planning | complete
+```
+
+Any phase may enter `blocked`. Resume it only through recovery. `complete`
+requires `Current task: none`, `Draft plan: none`, `Blocker: none`, and
+`Next action: none`. The only exceptional backward transition is an unfinished
+task split performed through [references/task-splitting.md](references/task-splitting.md).
 
 Update status immediately after every durable boundary and before dispatching
 another worker: plan revision, task selection, coding return, self-test return,
@@ -284,9 +252,10 @@ recovery before dispatch:
 2. Inspect HEAD, `git status --short`, real diffs, untracked files, and expected
    task paths. Git and immutable artifacts override stale status prose.
 3. Ask `luna_runner` for missing mechanical facts only when needed.
-4. Give Sol the current authoritative inputs and the sanitized historical-facts
-   packet. Explicitly forbid every superseded plan path; do not give Sol the raw
-   historical artifacts. Sol returns:
+4. When attribution, evidence validity, remaining behavior, or next-worker
+   selection requires substantive judgment, give Sol the current authoritative
+   inputs and sanitized historical-facts packet. Explicitly forbid every
+   superseded plan path; do not give Sol raw historical artifacts. Sol returns:
 
 ```text
 Recovered Task:
@@ -300,7 +269,8 @@ Next Worker:
 Exact Next Action:
 ```
 
-5. The dispatcher reconciles `status.md` from that decision, then continues.
+5. The dispatcher mechanically reconciles `status.md` from repository facts or
+   that Sol decision, validates it, then continues.
 
 Do not redispatch an apparently unstarted task when attributable implementation
 already exists. Do not discard partial work, rerun completed gates without an
@@ -329,8 +299,9 @@ If no task was ever selected, begin at task 1. The dispatcher then:
    the required `Historical isolation` summary, and has no out-of-scope product
    changes. Trace every proposed interface, behavior, invariant, and acceptance
    gate to a current normative input, an explicit user decision, or a proved
-   necessary implementation constraint. Remove anything supported only by a
-   superseded artifact or sibling implementation before presenting the draft;
+   necessary implementation constraint. If anything is supported only by a
+   superseded artifact or sibling implementation, reject the draft and return
+   the exact issue to Sol; the dispatcher must not edit the plan;
 4. sets `Draft plan: plan-N.md`, enters `plan_review`, and sets no current
    implementation task; retain the prior `Active plan` until approval;
 5. presents the actually written draft and its task boundaries to the user;
@@ -415,44 +386,10 @@ accepted behavior and scope, it is task refinement, not a new design plan.
 
 ### Split an unfinished broad task
 
-Completed, passed tasks are immutable. Sol may directly replace a not-started
-broad task in the active plan with smaller tasks without creating another plan,
-provided accepted behavior and scope remain unchanged. Keep the parent entry
-as superseded history rather than deleting it.
-
-Apply these identifier rules to every split:
-
-1. Number replacements within the original root task family. Splitting
-   `task-B` creates `task-B.1`, `task-B.2`, and so on; do not consume unrelated
-   root integers. Keep split identifiers flat: never create `task-B.2.1`.
-2. When splitting an existing child `task-B.i` into K replacements, keep
-   `task-B.i` as the superseded historical parent, reserve
-   `task-B.(i+1)` through `task-B.(i+K)` for its replacements, and shift every
-   later unmaterialized sibling `task-B.j` upward by K before inserting them.
-   Rename those future plan entries from highest to lowest to avoid collisions.
-   Example: if `task-6.2` and planned `task-6.3` exist, splitting `task-6.2`
-   into two produces replacement tasks `task-6.3` and `task-6.4`, and renames
-   the former planned `task-6.3` to `task-6.5`.
-3. A task is materialized once it has a task artifact, is current in status,
-   has a code commit, or has a review. Never rename or reuse a materialized
-   identifier. If a required shift would cross a materialized later sibling,
-   stop and request a plan revision instead of inventing another numbering
-   scheme or rewriting history.
-
-If coding has started but the task remains unfinished:
-
-1. Stop further implementation and recover the current diff.
-2. Have Sol identify the smallest complete behavior represented by existing
-   work and the remaining independent behaviors.
-3. Revise the active `plan-N.md` in place to mark the old task `superseded
-   before completion`, state the reason and replacement task numbers, and assign
-   existing work to the first replacement task. Keep `Active plan` unchanged.
-4. Preserve the old `task-M.md`; do not overwrite it or discard its diff.
-5. Implement, self-test, commit, and review each replacement independently.
-
-Ordered coding steps may exist inside one task, but they are not workflow
-stages, review gates, or separate acceptance units. If a step needs its own
-review, make it a task.
+Before splitting any planned or unfinished task, read and follow
+[references/task-splitting.md](references/task-splitting.md) completely. Never
+rename a materialized identifier or discard attributable partial work. Ordered
+steps that require separate acceptance or review must become separate tasks.
 
 ## Implement and self-test
 
@@ -472,7 +409,8 @@ After self-tests pass, the dispatcher:
 1. verifies worker identity and complete command evidence;
 2. compares status/diff paths with exact task scope;
 3. confirms every deletion was authorized;
-4. stages explicit code/test/fixture paths only;
+4. stages only explicit task-owned code, test, fixture, config, package,
+   documentation, and accepted plan/task checkpoint paths;
 5. runs `git diff --cached --check`;
 6. verifies the staged name set exactly;
 7. commits the task implementation immediately with the accepted subject;
@@ -513,7 +451,10 @@ not create another final-ledger commit.
 
 Do not start `luna_runner` automatically after coding self-tests. Coding-worker
 evidence is trusted unless concrete risk or inconsistency requires an
-independent run. Sol or the user may require verification when:
+independent run. Decide the requirement in the task contract when foreseeable;
+if risk appears later, return it to Sol before review. Run optional verification
+after the applicable implementation or correction commit and before Sol reviews
+that commit. Sol or the user may require verification when:
 
 - the coding worker was interrupted or returned incomplete evidence;
 - reported results conflict with the diff, tests, or repository state;
@@ -529,8 +470,14 @@ runner returns raw commands, exits, counts, status, diff, interruption state,
 and generated artifacts. It does not edit or provide a code-review verdict.
 
 If optional verification fails, Sol decides the correction, Luna implements and
-self-tests it, the dispatcher commits a new review correction, and Sol reviews
-that commit.
+self-tests it, and the dispatcher creates a `task-M verification-K correction`
+implementation commit and indexes it in `commit.md`. Repeat the same warranted
+verification against that commit. Proceed to Sol review only after it passes;
+another failure returns to rework with K incremented.
+
+If it passes, record its exact evidence in status, validate the checkpoint, and
+continue directly to review. Do not create a verification-only commit unless
+the evidence itself must be preserved for recovery before review.
 
 ## Continue and complete
 
@@ -543,6 +490,9 @@ it needs.
 The dispatcher executes the continuity decision after the passed review commit.
 Stop for missing authority, real specification conflict, unsafe scope, or
 repository facts that invalidate the plan. Mark the initiative complete only
-when every non-superseded task has a passed review, all code commits are indexed,
-status names no blocker, and the final worktree contains no unexpected task
-artifact.
+when every non-superseded task has a passed review, all implementation commits
+are indexed, status names no blocker, every governing workflow artifact is
+tracked, structural validation passes, the required review and verification
+evidence is present, and the final worktree contains no unexpected task or
+workflow change. Preserve unrelated user changes without treating them as task
+scope.
