@@ -99,6 +99,41 @@ those facts first and sends Sol a bounded evidence packet. Sol reasons from
 that packet and inspects only decisive files when needed; it must not turn a
 planning contract into a repository-wide audit.
 
+#### Read-access contract
+
+Read access is separate from mechanical inspection. Every Sol contract must
+explicitly name all four of these fields:
+
+- `Allowed read paths`: exact normative, task, source, test, and evidence paths
+  Sol may open. A path listed here grants read access in the shared workspace;
+  the contract must not simultaneously say that all shell/file commands are
+  forbidden.
+- `Forbidden read paths`: every superseded plan, unrelated task contract, and
+  sibling artifact that must not be opened or searched. Use exact paths and
+  explicit `task-M.md` globs where applicable.
+- `Allowed read-only commands`: normally `sed`, `awk`, `rg`, and bounded file
+  existence/listing checks restricted to `Allowed read paths`. These commands
+  may inspect text and metadata but must not write, generate, or mutate files.
+- `Forbidden mechanical commands`: Git, build, test, lint, formatting, network,
+  or other commands reserved for the dispatcher or `luna_runner`.
+
+The same four fields are required in every Luna coding-worker and Luna runner
+contract, with the worker's exact task contract and owned source/test paths
+listed explicitly. A coding worker may read its current task contract and
+decisive repository files; a runner may read the bounded evidence paths needed
+for its specified commands. Neither receives broad initiative-directory read
+permission.
+
+The dispatcher must resolve permission contradictions before spawning a worker.
+In particular, `Allowed read paths` plus `Forbidden shell commands` is invalid
+when the worker has no non-shell file reader: permit bounded read-only commands
+instead. If a worker reports it cannot read a path that the contract already
+allows, reissue the contract with explicit read-only command permission before
+replanning, changing product scope, or marking the task blocked. If the needed
+path is outside the contract, the dispatcher or `luna_runner` must extract only
+the required fact and pass it as labeled evidence; the worker must not widen
+its own read scope.
+
 ### Luna coding worker
 
 `luna_coding_worker` owns only the current task's exact product/test paths. It
