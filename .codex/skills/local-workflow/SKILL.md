@@ -156,6 +156,46 @@ The dispatcher owns routing, worker identity and permission checks,
 Git commits. It forwards Sol decisions without technical reinterpretation and
 does not replace worker-authored evidence with its own technical conclusion.
 
+## Use only the permission the operation requires
+
+Task commits, tests, builds, static checks, and temporary verification do not
+inherently require a permission prompt. Before each command, resolve its exact
+operation, paths, external effects, and the current runtime's sandbox and
+approval rules:
+
+- run it directly when the operation is allowed in the sandbox or is already
+  covered by a sufficiently narrow approval;
+- request approval before execution when the runtime already identifies the
+  exact operation as requiring it, including known restricted writes,
+  destructive operations, or other operations that the platform requires to
+  be approved in advance;
+- if an otherwise reasonable sandboxed attempt fails because of an unforeseen
+  permission, network, or external-service restriction, first narrow the
+  command and affected paths, then retry through the runtime's approval
+  mechanism when the operation remains necessary and in scope.
+
+Do not request approval merely because a command is a commit, test, build, or
+uses a command prefix without a pre-existing reusable approval rule. Conversely,
+do not deliberately run an operation that is already known to require approval
+just to obtain a failure. Permission prompts are execution constraints, never
+task acceptance gates.
+
+Keep verification commands and their effects bounded. Group related checks
+when that reduces repeated setup or prompts without hiding their individual
+commands, exits, or artifacts. Do not wrap validation in an unbounded shell
+command or clean a broad shared location. When temporary files are needed,
+create a unique task-scoped directory with `mktemp -d` using a project/task
+prefix, record the resolved path, operate only inside it, and remove only the
+artifacts created by that verification. A deterministic shared `/tmp` path is
+not safe across retries, recovery, or concurrent runs.
+
+If required verification remains blocked after the appropriate approval path
+is unavailable or the user declines it, record the exact command, paths,
+restriction, and missing evidence in `status.md` and stop at `blocked`. A
+bounded script for the user is a last-resort handoff, not a substitute for an
+available approval request; do not continue review or commit as though its
+missing result had passed.
+
 ## Persist only useful history
 
 Keep these initiative artifacts:
