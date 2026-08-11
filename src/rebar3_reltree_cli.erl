@@ -74,10 +74,8 @@ run_install(Request, Context) ->
         {ok, Parent} ->
             case packaged_source(Context) of
                 {ok, Source} ->
-                    Options = maps:get(installer_options, Context, #{}),
                     Result = rebar3_reltree_skill_install:install(
-                               Source, Parent, maps:get(force, Request),
-                               Options),
+                               Source, Parent, maps:get(force, Request)),
                     case Result of
                         {ok, Target} ->
                             {0, ["reltree skill installed at ", Target, "\n"]};
@@ -144,7 +142,7 @@ error_output({install, Stage, Path, Reason}) ->
      ": ", io_lib:format("~p", [Reason]), "\n"];
 error_output({invalid_command, Command}) ->
     ["reltree: unknown command ", io_lib:format("~p", [Command]),
-     "; use 'skill --install'\n"];
+     "; run 'reltree' or 'reltree --help'\n"];
 error_output({invalid_option, Option, Value}) ->
     ["reltree: invalid option ", io_lib:format("~p", [Option]),
      " value ", io_lib:format("~p", [Value]), "\n"];

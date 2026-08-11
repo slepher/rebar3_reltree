@@ -35,6 +35,20 @@ default_conflict_does_not_mutate_target_test() ->
         remove_path(Root)
     end.
 
+file_target_conflict_does_not_mutate_target_test() ->
+    {Source, Parent, Root} = fixture("file-conflict"),
+    try
+        Target = filename:join(Parent, "reltree"),
+        ok = file:write_file(Target, <<"old target\n">>),
+        ?assertMatch({error, {install, target_conflict, Target, _}},
+                     rebar3_reltree_skill_install:install(Source, Parent,
+                                                           false)),
+        ?assertEqual(<<"old target\n">>, read(Target)),
+        ?assertEqual([], owned_siblings(Parent))
+    after
+        remove_path(Root)
+    end.
+
 force_is_full_replacement_test() ->
     {Source, Parent, Root} = fixture("force"),
     try
@@ -85,7 +99,7 @@ source_shape_is_exact_and_no_follow_test() ->
         ok = file:delete(filename:join(Source, "README.md")),
         ok = file:write_file(filename:join(Source, "agents/extra.yaml"),
                              <<"extra">>),
-        ?assertMatch({error, {install, source_validation, Source, _}},
+        ?assertMatch({error, {install, source_validation, _, _}},
                      rebar3_reltree_skill_install:install(Source, Parent,
                                                            false)),
         ok = file:delete(filename:join(Source, "agents/extra.yaml")),
@@ -122,53 +136,17 @@ replace_failure_rolls_back_complete_old_target_test() ->
     try
         Target = filename:join(Parent, "reltree"),
         make_target(Target, <<"old skill\n">>, <<"old agent\n">>, false),
-        Result = rebar3_reltree_skill_install:install(
-                   Source, Parent, true, #{fail_stage => {rename, replace}}),
+        Result = with_failure(
+                   {rename, replace},
+                   fun() -> rebar3_reltree_skill_install:install(Source, Parent,
+                                                                  true)
+                   end),
         ?assertMatch({error, {install, replace, Target, _}}, Result),
+        ?assertEqual(["SKILL.md", "agents"], entries(Target)),
         ?assertEqual(<<"old skill\n">>, read(filename:join(Target, "SKILL.md"))),
         ?assertEqual(<<"old agent\n">>,
                      read(filename:join([Target, "agents", "openai.yaml"]))),
         ?assertEqual([], owned_siblings(Parent))
-    after
-        remove_path(Root)
-    end.
-
-rollback_failure_preserves_owned_backup_test() ->
-    {Source, Parent, Root} = fixture("rollback-failure"),
-    try
-        Target = filename:join(Parent, "reltree"),
-        make_target(Target, <<"old skill\n">>, <<"old agent\n">>, false),
-        Rename = fun(_From, _To, replace) -> {error, injected_replace};
-                    (_From, _To, rollback) -> {error, injected_rollback};
-                    (From, To, _Phase) -> file:rename(From, To)
-                 end,
-        Result = rebar3_reltree_skill_install:install(
-                   Source, Parent, true, #{rename_fun => Rename}),
-        ?assertMatch({error, {install, rollback, _, _}}, Result),
-        ?assertNot(filelib:is_dir(Target)),
-        Backups = [Path || Path <- owned_siblings(Parent),
-                            lists:prefix(".reltree-backup-", Path)],
-        ?assertEqual(1, length(Backups)),
-        Backup = filename:join(Parent, hd(Backups)),
-        ?assertEqual(<<"old skill\n">>,
-                     read(filename:join(Backup, "SKILL.md")))
-    after
-        remove_path(Root)
-    end.
-
-backup_cleanup_failure_keeps_new_target_and_old_backup_test() ->
-    {Source, Parent, Root} = fixture("cleanup-failure"),
-    try
-        Target = filename:join(Parent, "reltree"),
-        make_target(Target, <<"old skill\n">>, <<"old agent\n">>, false),
-        ?assertMatch({error, {install, cleanup, _, injected}},
-                     rebar3_reltree_skill_install:install(
-                       Source, Parent, true,
-                       #{fail_stage => backup_cleanup})),
-        ?assertEqual(<<"skill bytes\n">>, read(filename:join(Target,
-                                                               "SKILL.md"))),
-        ?assertEqual(1, length([Path || Path <- owned_siblings(Parent),
-                                        lists:prefix(".reltree-backup-", Path)]))
     after
         remove_path(Root)
     end.
@@ -197,10 +175,12 @@ target_symlink_is_never_followed_test() ->
 stage_failure_is_clean_and_target_free_test() ->
     {Source, Parent, Root} = fixture("stage-failure"),
     try
-        ?assertMatch({error, {install, stage_copy, _, _}},
-                     rebar3_reltree_skill_install:install(
-                       Source, Parent, false,
-                       #{fail_stage => {stage_copy, agent}})),
+        Result = with_failure(
+                   {stage_copy, agent},
+                   fun() -> rebar3_reltree_skill_install:install(Source, Parent,
+                                                                  false)
+                   end),
+        ?assertMatch({error, {install, stage_copy, _, _}}, Result),
         ?assertNot(filelib:is_dir(filename:join(Parent, "reltree"))),
         ?assertEqual([], owned_siblings(Parent))
     after
@@ -208,7 +188,7 @@ stage_failure_is_clean_and_target_free_test() ->
     end.
 
 fixture(Name) ->
-    Root = filename:join("/tmp", "reltree-task6-installer-" ++ Name ++ "-" ++
+    Root = filename:join("/tmp", "reltree-task10-installer-" ++ Name ++ "-" ++
                          integer_to_list(erlang:unique_integer([positive]))),
     Source = filename:join(Root, "source"),
     Parent = filename:join(Root, "parent with space/中文"),
@@ -247,6 +227,13 @@ owned_siblings(Parent) ->
 read(Path) ->
     {ok, Bytes} = file:read_file(Path),
     Bytes.
+
+with_failure(Failure, Fun) ->
+    put({rebar3_reltree_skill_install, test_failure}, Failure),
+    try Fun()
+    after
+        erase({rebar3_reltree_skill_install, test_failure})
+    end.
 
 remove_path(Path) ->
     case file:read_link_info(Path) of

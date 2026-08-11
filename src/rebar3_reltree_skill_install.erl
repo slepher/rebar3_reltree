@@ -2,7 +2,7 @@
 
 -include_lib("kernel/include/file.hrl").
 
--export([install/3, install/4, resolve_destination/2, format_error/1]).
+-export([install/3, resolve_destination/2]).
 
 -define(SKILL_NAME, "reltree").
 -define(MAX_PATH_HOPS, 64).
@@ -39,20 +39,14 @@ resolve_destination(Options, EnvFun) when is_function(EnvFun, 1) ->
 
 -spec install(string(), string(), boolean()) ->
     {ok, string()} | {error, term()}.
-install(Source, Parent, Force) ->
-    install(Source, Parent, Force, #{}).
-
--spec install(string(), string(), boolean(), map() | fun()) ->
-    {ok, string()} | {error, term()}.
-install(Source0, Parent0, Force, Options0)
+install(Source0, Parent0, Force)
   when is_boolean(Force) ->
-    Options = normalize_options(Options0),
     case absolute_path(Source0, source) of
         {ok, Source} ->
             case absolute_path(Parent0, parent) of
                 {ok, Parent} ->
                     Target = target_for_parent(Parent),
-                    install_paths(Source, Parent, Target, Force, Options);
+                    install_paths(Source, Parent, Target, Force);
                 {error, Error} ->
                     Error
             end;
@@ -60,36 +54,50 @@ install(Source0, Parent0, Force, Options0)
             Error
     end;
 
-install(_Source, _Parent, _Force, _Options) ->
+install(_Source, _Parent, _Force) ->
     install_error(parent, ".", invalid_arguments).
 
-install_paths(Source, Parent, Target, Force, Options) ->
+install_paths(Source, Parent, Target, Force) ->
     case validate_source(Source) of
         {ok, Files} ->
-            case paths_overlap(Source, Parent, Target) of
-                {ok, false} ->
-                    case ensure_parent_directory(Parent) of
-                        ok ->
-                            case preflight_target(Target, Force) of
-                                ok -> stage(Source, Parent, Target, Force,
-                                            Files, Options);
-                                {error, {target_conflict, Reason}} ->
-                                    install_error(target_conflict, Target,
-                                                  Reason);
-                                {error, {target, Reason}} ->
-                                    install_error(target, Target, Reason)
+            case validate_parent_path(Parent) of
+                ok ->
+                    case paths_overlap(Source, Parent, Target) of
+                        {ok, false} ->
+                            case ensure_parent_directory(Parent) of
+                                ok ->
+                                    case preflight_target(Target, Force) of
+                                        ok -> stage(Source, Parent, Target,
+                                                    Force, Files);
+                                        {error, {target_conflict, Reason}} ->
+                                            install_error(target_conflict,
+                                                          Target, Reason);
+                                        {error, {target, Reason}} ->
+                                            install_error(target, Target,
+                                                          Reason)
+                                    end;
+                                {error, Reason} ->
+                                    install_error(parent, Parent, Reason)
                             end;
+                        {ok, true} ->
+                            install_error(source_validation, Source,
+                                          {source_target_overlap, Target});
                         {error, Reason} ->
-                            install_error(parent, Parent, Reason)
+                            install_error(source_validation, Source, Reason)
                     end;
-                {ok, true} ->
-                    install_error(source_validation, Source,
-                                  {source_target_overlap, Target});
                 {error, Reason} ->
-                    install_error(source_validation, Source, Reason)
+                    install_error(parent, Parent, Reason)
             end;
         {error, Path, Reason} ->
             install_error(source_validation, Path, Reason)
+    end.
+
+validate_parent_path(Path) ->
+    case file:read_link_info(Path) of
+        {ok, #file_info{type = directory}} -> ok;
+        {ok, #file_info{type = Type}} -> {error, {not_directory, Type}};
+        {error, enoent} -> ok;
+        {error, Reason} -> {error, Reason}
     end.
 
 preflight_target(Target, true) ->
@@ -105,34 +113,28 @@ preflight_target(Target, false) ->
         {error, Reason} -> {error, {target, Reason}}
     end.
 
-stage(Source, Parent, Target, Force, Files, Options) ->
-    case create_stage(Parent, Options) of
+stage(Source, Parent, Target, Force, Files) ->
+    case create_stage(Parent) of
         {ok, Stage} ->
-            case copy_stage(Source, Stage, Files, Options) of
+            case copy_stage(Source, Stage, Files) of
                 ok ->
-                    case validate_stage(Stage, Files, Options) of
-                        ok -> activate(Stage, Parent, Target, Force,
-                                       Options);
+                    case validate_stage(Stage, Files) of
+                        ok -> activate(Stage, Parent, Target, Force);
                         {error, Reason} ->
                             cleanup_after_error(
-                              Stage, Options,
+                              Stage,
                               install_error(stage_validate, Stage, Reason))
                     end;
                 {error, Reason} ->
                     cleanup_after_error(
-                      Stage, Options, install_error(stage_copy, Stage, Reason))
+                      Stage, install_error(stage_copy, Stage, Reason))
             end;
         {error, Reason} ->
             install_error(stage_create, Parent, Reason)
     end.
 
-create_stage(Parent, Options) ->
-    case injected_failure(Options, stage_create) of
-        {error, Reason} ->
-            {error, Reason};
-        ok ->
-            create_owned_directory(Parent, ?STAGE_PREFIX, 0)
-    end.
+create_stage(Parent) ->
+    create_owned_directory(Parent, ?STAGE_PREFIX, 0).
 
 create_owned_directory(_Parent, _Prefix, Attempts) when Attempts >= 128 ->
     {error, name_allocation_exhausted};
@@ -146,53 +148,35 @@ create_owned_directory(Parent, Prefix, Attempts) ->
             {error, {Path, Reason}}
     end.
 
-copy_stage(_Source, Stage, {SkillBytes, AgentBytes}, Options) ->
+copy_stage(_Source, Stage, {SkillBytes, AgentBytes}) ->
     Agents = filename:join(Stage, "agents"),
-    case injected_failure(Options, {stage_copy, agents}) of
-        {error, Reason} ->
-            {error, {agents, Reason}};
-        ok ->
-            copy_stage_files(Agents, Stage, SkillBytes, AgentBytes, Options)
-    end.
+    copy_stage_files(Agents, Stage, SkillBytes, AgentBytes).
 
-copy_stage_files(Agents, Stage, SkillBytes, AgentBytes, Options) ->
+copy_stage_files(Agents, Stage, SkillBytes, AgentBytes) ->
     case file:make_dir(Agents) of
         ok ->
             case copy_leaf(SkillBytes, filename:join(Stage, "SKILL.md"),
-                           skill, Options) of
+                           skill) of
                 ok ->
                     copy_leaf(AgentBytes,
                               filename:join(Agents, "openai.yaml"),
-                              agent, Options);
+                              agent);
                 {error, _} = Error -> Error
             end;
         {error, Reason} ->
             {error, {agents, Reason}}
     end.
 
-copy_leaf(Bytes, Path, Name, Options) ->
-    case injected_failure(Options, {stage_copy, Name}) of
+copy_leaf(Bytes, Path, Name) ->
+    case test_failure({stage_copy, Name}) of
         {error, Reason} ->
             {error, {Name, Reason}};
         ok ->
             case file:open(Path, [write, binary, exclusive]) of
                 {ok, IoDevice} ->
-                    WriteResult = case injected_failure(
-                                         Options, {stage_copy_write, Name}) of
-                                      {error, WriteReason} ->
-                                          {error, WriteReason};
-                                      ok -> file:write(IoDevice, Bytes)
-                                  end,
-                    case WriteResult of
+                    case file:write(IoDevice, Bytes) of
                         ok ->
-                            CloseResult = case injected_failure(
-                                                  Options,
-                                                  {stage_copy_close, Name}) of
-                                              {error, CloseReason} ->
-                                                  {error, CloseReason};
-                                              ok -> file:close(IoDevice)
-                                          end,
-                            case CloseResult of
+                            case file:close(IoDevice) of
                                 ok -> ok;
                                 {error, CloseFailure} ->
                                     _ = file:close(IoDevice),
@@ -207,22 +191,17 @@ copy_leaf(Bytes, Path, Name, Options) ->
             end
     end.
 
-validate_stage(Stage, Files, Options) ->
-    case injected_failure(Options, stage_validate) of
-        {error, Reason} ->
-            {error, Reason};
+validate_stage(Stage, Files) ->
+    case validate_directory(Stage, ["SKILL.md", "agents"]) of
         ok ->
-            case validate_directory(Stage, ["SKILL.md", "agents"]) of
+            case validate_directory(filename:join(Stage, "agents"),
+                                    ["openai.yaml"]) of
                 ok ->
-                    case validate_directory(filename:join(Stage, "agents"),
-                                            ["openai.yaml"]) of
-                        ok ->
-                            validate_stage_files(Stage, Files);
-                        {error, _Path, Reason} -> {error, Reason}
-                    end;
-                {error, _Path, Reason} ->
-                    {error, Reason}
-            end
+                    validate_stage_files(Stage, Files);
+                {error, _Path, Reason} -> {error, Reason}
+            end;
+        {error, _Path, Reason} ->
+            {error, Reason}
     end.
 
 validate_stage_files(Stage, {SkillBytes, AgentBytes}) ->
@@ -239,55 +218,53 @@ validate_stage_files(Stage, {SkillBytes, AgentBytes}) ->
             {error, {skill_md, Reason}}
     end.
 
-activate(Stage, _Parent, Target, false, Options) ->
+activate(Stage, _Parent, Target, false) ->
     case target_state(Target) of
         absent ->
-            case rename_path(Stage, Target, first_install, Options) of
+            case rename_path(Stage, Target, first_install) of
                 ok -> {ok, Target};
                 {error, Reason} ->
                     cleanup_after_error(
-                      Stage, Options, install_error(replace, Target, Reason))
+                      Stage, install_error(replace, Target, Reason))
             end;
         {exists, Type} ->
             cleanup_after_error(
-              Stage, Options,
+              Stage,
               install_error(target_conflict, Target, {exists, Type}));
         {error, Reason} ->
             cleanup_after_error(
-              Stage, Options, install_error(target, Target, Reason))
+              Stage, install_error(target, Target, Reason))
     end;
-activate(Stage, Parent, Target, true, Options) ->
+activate(Stage, Parent, Target, true) ->
     case target_state(Target) of
         absent ->
-            case rename_path(Stage, Target, first_install, Options) of
+            case rename_path(Stage, Target, first_install) of
                 ok -> {ok, Target};
                 {error, Reason} ->
                     cleanup_after_error(
-                      Stage, Options, install_error(replace, Target, Reason))
+                      Stage, install_error(replace, Target, Reason))
             end;
         {exists, _Type} ->
-            case rename_backup(Target, Parent, Options) of
+            case rename_backup(Target, Parent) of
                 {ok, ActualBackup} ->
-                    case rename_path(Stage, Target, replace, Options) of
+                    case rename_path(Stage, Target, replace) of
                         ok ->
-                            case cleanup_owned(ActualBackup, backup_cleanup,
-                                               Options) of
+                            case cleanup_owned(ActualBackup) of
                                 ok -> {ok, Target};
                                 {error, Reason} ->
                                     install_error(cleanup, ActualBackup,
                                                   Reason)
                             end;
                         {error, ReplaceReason} ->
-                            rollback(Stage, Target, ActualBackup, ReplaceReason,
-                                     Options)
+                            rollback(Stage, Target, ActualBackup, ReplaceReason)
                     end;
                 {error, Reason} ->
                     cleanup_after_error(
-                      Stage, Options, install_error(backup, Target, Reason))
+                      Stage, install_error(backup, Target, Reason))
             end;
         {error, Reason} ->
             cleanup_after_error(
-              Stage, Options, install_error(target, Target, Reason))
+              Stage, install_error(target, Target, Reason))
     end.
 
 target_state(Target) ->
@@ -297,33 +274,33 @@ target_state(Target) ->
         {error, Reason} -> {error, Reason}
     end.
 
-rename_backup(Target, Parent, Options) ->
-    rename_backup(Target, Parent, Options, 0).
+rename_backup(Target, Parent) ->
+    rename_backup(Target, Parent, 0).
 
-rename_backup(_Target, _Parent, _Options, Attempts)
+rename_backup(_Target, _Parent, Attempts)
   when Attempts >= ?MAX_NAME_ATTEMPTS ->
     {error, name_allocation_exhausted};
-rename_backup(Target, Parent, Options, Attempts) ->
+rename_backup(Target, Parent, Attempts) ->
     Backup = sibling_path(Parent, ?BACKUP_PREFIX),
     case file:read_link_info(Backup) of
         {error, enoent} ->
-            case rename_path(Target, Backup, backup, Options) of
+            case rename_path(Target, Backup, backup) of
                 ok -> {ok, Backup};
                 {error, eexist} ->
-                    rename_backup(Target, Parent, Options, Attempts + 1);
+                    rename_backup(Target, Parent, Attempts + 1);
                 {error, Reason} ->
                     {error, Reason}
             end;
         {ok, _Info} ->
-            rename_backup(Target, Parent, Options, Attempts + 1);
+            rename_backup(Target, Parent, Attempts + 1);
         {error, Reason} ->
             {error, {Backup, Reason}}
     end.
 
-rollback(Stage, Target, Backup, ReplaceReason, Options) ->
-    case rename_path(Backup, Target, rollback, Options) of
+rollback(Stage, Target, Backup, ReplaceReason) ->
+    case rename_path(Backup, Target, rollback) of
         ok ->
-            case cleanup_owned(Stage, stage_cleanup, Options) of
+            case cleanup_owned(Stage) of
                 ok -> install_error(replace, Target, ReplaceReason);
                 {error, CleanupReason} ->
                     install_error(rollback, Stage,
@@ -331,7 +308,7 @@ rollback(Stage, Target, Backup, ReplaceReason, Options) ->
                                    {stage_cleanup, CleanupReason}})
             end;
         {error, RollbackReason} ->
-            case cleanup_owned(Stage, stage_cleanup, Options) of
+            case cleanup_owned(Stage) of
                 ok ->
                     install_error(rollback, Backup,
                                   {replace, ReplaceReason, RollbackReason});
@@ -342,48 +319,23 @@ rollback(Stage, Target, Backup, ReplaceReason, Options) ->
             end
     end.
 
-rename_path(From, To, Phase, Options) ->
-    case injected_failure(Options, {rename, Phase}) of
+rename_path(From, To, Phase) ->
+    case test_failure({rename, Phase}) of
         {error, Reason} ->
             {error, Reason};
         ok ->
-            Rename = maps:get(rename_fun, Options, fun file:rename/2),
-            safe_rename(Rename, From, To, Phase)
+            file:rename(From, To)
     end.
 
-safe_rename(Rename, From, To, _Phase) when is_function(Rename, 2) ->
-    try Rename(From, To) of
-        ok -> ok;
-        {error, Reason} -> {error, Reason};
-        Other -> {error, {unexpected_result, Other}}
-    catch
-        Class:Reason -> {error, {exception, Class, Reason}}
-    end;
-safe_rename(Rename, From, To, Phase) when is_function(Rename, 3) ->
-    try Rename(From, To, Phase) of
-        ok -> ok;
-        {error, Reason} -> {error, Reason};
-        Other -> {error, {unexpected_result, Other}}
-    catch
-        Class:Reason -> {error, {exception, Class, Reason}}
-    end;
-safe_rename(_Rename, _From, _To, _Phase) ->
-    {error, invalid_rename_function}.
-
-cleanup_after_error(Path, Options, Original) ->
-    case cleanup_owned(Path, stage_cleanup, Options) of
+cleanup_after_error(Path, Original) ->
+    case cleanup_owned(Path) of
         ok -> Original;
         {error, Reason} ->
             install_error(cleanup, Path, {original, Original, Reason})
     end.
 
-cleanup_owned(Path, Kind, Options) ->
-    case injected_failure(Options, Kind) of
-        {error, Reason} ->
-            {error, Reason};
-        ok ->
-            remove_owned(Path)
-    end.
+cleanup_owned(Path) ->
+    remove_owned(Path).
 
 remove_owned(Path) ->
     case file:read_link_info(Path) of
@@ -615,36 +567,21 @@ first_environment_value([Name | Rest], EnvFun) ->
         Result -> Result
     end.
 
-normalize_options(Options) when is_map(Options) -> Options;
-normalize_options(RenameFun) when is_function(RenameFun, 2) ->
-    #{rename_fun => RenameFun};
-normalize_options(RenameFun) when is_function(RenameFun, 3) ->
-    #{rename_fun => RenameFun};
-normalize_options(_Options) -> #{}.
-
-injected_failure(Options, Key) ->
-    Fail = maps:get(fail_stage, Options, maps:get(fail, Options, none)),
-    case failure_key(Fail, Key) of
-        true -> {error, injected};
-        false -> ok
+%% Tests set this process-local marker directly; there is no production
+%% failure-injection API or transaction option surface.
+test_failure(Key) ->
+    case get({?MODULE, test_failure}) of
+        Key -> {error, injected};
+        Keys when is_list(Keys) ->
+            case lists:member(Key, Keys) of
+                true -> {error, injected};
+                false -> ok
+            end;
+        _ -> ok
     end.
-
-failure_key(Fail, Key) when Fail =:= Key -> true;
-failure_key(Fail, Key) when is_list(Fail) -> lists:member(Key, Fail);
-failure_key(_Fail, _Key) -> false.
 
 install_error(Stage, Path, Reason) ->
     {error, {install, Stage, Path, Reason}}.
-
--spec format_error(term()) -> iolist().
-format_error({install, Stage, Path, Reason}) ->
-    ["install ", atom_to_list(Stage), " at ", path_text(Path), ": ",
-     io_lib:format("~p", [Reason])];
-format_error(Reason) ->
-    io_lib:format("~p", [Reason]).
-
-path_text(Path) when is_list(Path) -> Path;
-path_text(Path) -> io_lib:format("~p", [Path]).
 
 loader_read_link_info(Path) ->
     case erl_prim_loader:read_link_info(Path) of
