@@ -9,12 +9,12 @@
 
 ## Current phase
 
-- Phase: `rework`
+- Phase: `committing`
 - Active plan: `plan-1.md`
 - Draft plan: `none`
 - Current task: `task-5`
-- Implementation stage: `task-5 review 1 changes_required; correction limited to version assertions`
-- Next action: commit the review artifact and ledger/status checkpoint, then dispatch Luna for the exact review-1 correction.
+- Implementation stage: `task-5 passed review 2; recording final review checkpoint`
+- Next action: commit review-2 artifact, status and final task-5 ledger, then have Sol write task-6.md.
 
 ## Repository snapshot
 
@@ -116,6 +116,14 @@
   app below highest, minor/major jumps, non-zero next-minor patch, and non-zero next-major minor/patch;
   no product logic finding or scope violation was reported. Review artifact:
   `task-5-code-review-1.md`.
+- Review-1 correction self-tests passed: version EUnit 8/0; checkvsn EUnit 6/0; provider EUnit 12/0;
+  full EUnit 127/0; CT 5/0; compile 0; escriptize 0; diff check 0. Only
+  `test/rebar3_reltree_version_tests.erl` changed.
+- Dispatcher committed review-1 correction as `bfd3c04` with subject
+  `fix: task-5 review 1 version continuity assertions`; staged name set contained only the permitted test path.
+- Sol review 2 passed commits `85a1b8e` and `bfd3c04` with no material finding; review artifact is
+  `task-5-code-review-2.md`. The review confirms the correction completed the five independent
+  version-continuity rejection assertions without changing product logic or scope.
 
 ## Blocker
 
