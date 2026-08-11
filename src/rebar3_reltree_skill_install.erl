@@ -69,8 +69,16 @@ install_paths(Source, Parent, Target, Force, Options) ->
             case paths_overlap(Source, Parent, Target) of
                 {ok, false} ->
                     case ensure_parent_directory(Parent) of
-                        ok -> stage(Source, Parent, Target, Force, Files,
-                                    Options);
+                        ok ->
+                            case preflight_target(Target, Force) of
+                                ok -> stage(Source, Parent, Target, Force,
+                                            Files, Options);
+                                {error, {target_conflict, Reason}} ->
+                                    install_error(target_conflict, Target,
+                                                  Reason);
+                                {error, {target, Reason}} ->
+                                    install_error(target, Target, Reason)
+                            end;
                         {error, Reason} ->
                             install_error(parent, Parent, Reason)
                     end;
@@ -82,6 +90,19 @@ install_paths(Source, Parent, Target, Force, Options) ->
             end;
         {error, Path, Reason} ->
             install_error(source_validation, Path, Reason)
+    end.
+
+preflight_target(Target, true) ->
+    case target_state(Target) of
+        absent -> ok;
+        {exists, _Type} -> ok;
+        {error, Reason} -> {error, {target, Reason}}
+    end;
+preflight_target(Target, false) ->
+    case target_state(Target) of
+        absent -> ok;
+        {exists, Type} -> {error, {target_conflict, {exists, Type}}};
+        {error, Reason} -> {error, {target, Reason}}
     end.
 
 stage(Source, Parent, Target, Force, Files, Options) ->

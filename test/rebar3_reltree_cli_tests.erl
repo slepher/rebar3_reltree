@@ -3,26 +3,27 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("kernel/include/file.hrl").
 
-top_help_is_installer_only_test() ->
+top_help_is_bare_installer_only_test() ->
     Root = unique_root(),
     {Exit, Output} = rebar3_reltree_cli:run(["--help"],
                                              #{priv_dir => Root}),
     Text = lists:flatten(Output),
     ?assertEqual(0, Exit),
-    ?assert(string:str(Text, "skill --install") > 0),
+    ?assert(string:str(Text, "Usage: reltree [--dest DIR] [--force]") > 0),
+    ?assert(string:str(Text, "--dest DIR") > 0),
+    ?assert(string:str(Text, "--force") > 0),
     ?assertEqual(0, string:str(Text, " tree ")),
     ?assertEqual(0, string:str(Text, "bgate ")),
     ?assertEqual(0, string:str(Text, "checkvsn ")),
     ?assertNot(filelib:is_dir(Root)).
 
-skill_help_is_read_only_test() ->
+retired_skill_command_is_a_usage_error_test() ->
     Root = unique_root(),
     {Exit, Output} = rebar3_reltree_cli:run(["skill", "--help"],
                                              #{priv_dir => Root}),
     Text = lists:flatten(Output),
-    ?assertEqual(0, Exit),
-    ?assert(string:str(Text, "--dest DIR") > 0),
-    ?assert(string:str(Text, "--force") > 0),
+    ?assertEqual(2, Exit),
+    ?assert(string:str(Text, "unknown command") > 0),
     ?assertNot(filelib:is_dir(Root)).
 
 explicit_destination_installs_packaged_source_test() ->
@@ -30,7 +31,7 @@ explicit_destination_installs_packaged_source_test() ->
     try
         Dest = filename:join(Root, "destination with space/中文"),
         {Exit, Output} = rebar3_reltree_cli:run(
-                           ["skill", "--install", "--dest", Dest],
+                           ["--dest", Dest],
                            #{priv_dir => Priv}),
         Target = filename:join(filename:absname(Dest), "reltree"),
         ?assertEqual(0, Exit),
@@ -47,7 +48,7 @@ explicit_destination_does_not_read_environment_test() ->
         Dest = filename:join(Root, "explicit"),
         Env = fun(_Name) -> erlang:error(unexpected_environment_read) end,
         {0, _} = rebar3_reltree_cli:run(
-                    ["skill", "--install", "--dest", Dest, "--force"],
+                    ["--dest", Dest, "--force"],
                     #{priv_dir => Priv, env => Env}),
         ?assert(filelib:is_dir(filename:join(Dest, "reltree")))
     after
@@ -59,14 +60,14 @@ install_options_are_order_independent_test() ->
     try
         Dest = filename:join(Root, "dest"),
         {0, _} = rebar3_reltree_cli:run(
-                    ["skill", "--install", "--force", "--dest", Dest],
+                    ["--force", "--dest", Dest],
                     #{priv_dir => Priv}),
         ?assert(filelib:is_dir(filename:join(Dest, "reltree")))
     after
         remove_fixture(Root)
     end.
 
-project_commands_are_usage_errors_without_writes_test() ->
+retired_project_commands_are_usage_errors_without_writes_test() ->
     Root = unique_root(),
     lists:foreach(
       fun(Args) ->
@@ -75,18 +76,17 @@ project_commands_are_usage_errors_without_writes_test() ->
               ?assertEqual(2, Exit),
               ?assert(string:str(lists:flatten(Output), "reltree") > 0)
       end,
-      [["tree"], ["bgate", "--check"], ["checkvsn"], ["unknown"]]),
+      [["tree"], ["checkvsn"], ["bgate"], ["unknown"]]),
     ?assertNot(filelib:is_dir(Root)).
 
 invalid_install_arguments_are_usage_errors_test() ->
     Root = unique_root(),
-    ArgsList = [["skill"],
-                ["skill", "--install", "--dest"],
-                ["skill", "--install", "--dest", ""],
-                ["skill", "--install", "--force=yes"],
-                ["skill", "--install", "--force", "--force"],
-                ["skill", "--install", "--dest", "one", "--dest", "two"],
-                ["skill", "--install", "extra"]],
+    ArgsList = [["--dest"],
+                ["--dest", ""],
+                ["--force=yes"],
+                ["--force", "--force"],
+                ["--dest", "one", "--dest", "two"],
+                ["extra"]],
     lists:foreach(
       fun(Args) ->
               {Exit, _Output} = rebar3_reltree_cli:run(
@@ -101,7 +101,7 @@ source_failure_is_runtime_error_test() ->
         ok = file:delete(filename:join([Priv, "skills", "reltree", "SKILL.md"])),
         Dest = filename:join(Root, "dest"),
         {Exit, Output} = rebar3_reltree_cli:run(
-                           ["skill", "--install", "--dest", Dest],
+                           ["--dest", Dest],
                            #{priv_dir => Priv}),
         Text = lists:flatten(Output),
         ?assertEqual(1, Exit),

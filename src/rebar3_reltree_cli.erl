@@ -23,30 +23,24 @@ run(Args, Context) when is_list(Args), is_map(Context) ->
             run_install(Request, Context)
     end.
 
--spec help(top | skill) -> iolist().
+-spec help(top) -> iolist().
 help(top) ->
-    ["Usage: reltree skill --install [--dest DIR] [--force]\n\n",
-     "Commands:\n",
-     "  skill --install  install the packaged reltree skill\n\n",
-     "Run 'reltree skill --help' for help.\n"];
-help(skill) ->
-    ["Usage: reltree skill --install [--dest DIR] [--force]\n\n",
+    ["Usage: reltree [--dest DIR] [--force]\n\n",
+     "Install the packaged reltree skill locally.\n\n",
      "Options:\n",
      "  --dest DIR  install below DIR/reltree\n",
      "  --force     replace an existing reltree skill\n"].
 
 parse([]) ->
-    {help, top};
+    parse_install_args([], #{force => false});
 parse(["--help"]) ->
     {help, top};
 parse(["-h"]) ->
     {help, top};
-parse(["skill", "--help"]) ->
-    {help, skill};
-parse(["skill", "-h"]) ->
-    {help, skill};
-parse(["skill", "--install" | Args]) ->
-    parse_install_args(Args, #{force => false});
+parse(["--force" | Args]) ->
+    parse_install_args(["--force" | Args], #{force => false});
+parse(["--dest" | Args]) ->
+    parse_install_args(["--dest" | Args], #{force => false});
 parse([Command | _]) ->
     {error, {invalid_command, Command}}.
 
@@ -98,64 +92,33 @@ run_install(Request, Context) ->
     end.
 
 resolve_parent(#{dest := Dest}, _Context) ->
-    {ok, filename:absname(Dest)};
-resolve_parent(_Request, Context) ->
-    Env = maps:get(env, Context, fun os:getenv/1),
-    case environment_value("CODEX_HOME", Env) of
-        {ok, CodexHome} ->
-            {ok, filename:absname(filename:join(CodexHome, "skills"))};
-        absent ->
-            case user_home(Context) of
-                {ok, Home} ->
-                    {ok, filename:absname(filename:join([Home, ".codex",
-                                                         "skills"]))};
-                {error, Reason} ->
-                    {error, {install, parent, "user-home", Reason}}
-            end;
+    rebar3_reltree_skill_install:resolve_destination(
+      #{dest => Dest}, fun(_Name) -> erlang:error(unexpected_environment_read) end);
+resolve_parent(Request, Context) ->
+    Env = maps:get(env, Context,
+                   fun(Name) -> context_environment(Name, Context) end),
+    case rebar3_reltree_skill_install:resolve_destination(
+           Request, normalize_environment(Env)) of
+        {ok, Parent} ->
+            {ok, Parent};
         {error, Reason} ->
-            {error, {install, parent, "CODEX_HOME", Reason}}
+            {error, {install, parent, "destination", Reason}}
     end.
 
-environment_value(Name, Env) when is_function(Env, 1) ->
-    case Env(Name) of
-        false -> absent;
-        [] -> {error, empty};
-        Value when is_list(Value) -> {ok, Value};
-        Value -> {error, {invalid_value, Value}}
-    end;
-environment_value(Name, Env) when is_map(Env) ->
-    environment_value(Name, fun(Key) -> maps:get(Key, Env, false) end);
-environment_value(_Name, _Env) ->
-    {error, invalid_environment_source}.
+normalize_environment(Env) when is_function(Env, 1) ->
+    Env;
+normalize_environment(Env) when is_map(Env) ->
+    fun(Name) -> maps:get(Name, Env, false) end;
+normalize_environment(_Env) ->
+    fun(_Name) -> false end.
 
-user_home(Context) ->
+context_environment("HOME", Context) ->
     case maps:find(user_home, Context) of
-        {ok, Home} when is_list(Home), Home =/= [] ->
-            {ok, Home};
-        {ok, []} ->
-            {error, empty};
-        {ok, Value} ->
-            {error, {invalid_value, Value}};
-        error ->
-            user_home_from_os()
-    end.
-
-user_home_from_os() ->
-    case os:getenv("HOME") of
-        false ->
-            case os:getenv("USERPROFILE") of
-                false -> {error, unavailable};
-                [] -> {error, empty};
-                Home when is_list(Home) -> {ok, Home};
-                Value -> {error, {invalid_value, Value}}
-            end;
-        [] ->
-            {error, empty};
-        Home when is_list(Home) ->
-            {ok, Home};
-        Value ->
-            {error, {invalid_value, Value}}
-    end.
+        {ok, Home} -> Home;
+        error -> os:getenv("HOME")
+    end;
+context_environment(Name, _Context) ->
+    os:getenv(Name).
 
 packaged_source(Context) ->
     case maps:find(priv_dir, Context) of

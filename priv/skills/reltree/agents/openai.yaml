@@ -1,4 +1,4 @@
 interface:
   display_name: "Reltree"
   short_description: "Manage local Rebar3 relationships and releases"
-  default_prompt: "Use $reltree to inspect this project's local dependency tree and release readiness."
+  default_prompt: "Run reltree to install the packaged skill locally, then use it to inspect this project's local dependency tree and release readiness."
