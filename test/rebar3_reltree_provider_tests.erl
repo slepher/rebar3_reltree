@@ -9,12 +9,17 @@ provider_registration_test() ->
     ?assert(contains_term(Providers, reltree)),
     ?assert(contains_term(Providers, rebar3_reltree_prv_tree)),
     ?assert(contains_term(Providers, bgate)),
-    ?assert(contains_term(Providers, rebar3_reltree_prv_bgate)).
+    ?assert(contains_term(Providers, rebar3_reltree_prv_bgate)),
+    ?assert(contains_term(Providers, checkvsn)),
+    ?assert(contains_term(Providers, rebar3_reltree_prv_checkvsn)).
 
 provider_metadata_test() ->
     Spec = rebar3_reltree_prv_tree:option_spec(),
     ?assertMatch([{scan_roots, _, "scan-roots", string, _},
                   {rev, _, "rev", string, _}], Spec).
+
+provider_checkvsn_metadata_test() ->
+    ?assertEqual([], rebar3_reltree_prv_checkvsn:option_spec()).
 
 provider_bgate_metadata_and_request_test() ->
     ?assertMatch([{check, undefined, "check", boolean, _},

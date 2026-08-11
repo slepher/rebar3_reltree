@@ -23,7 +23,17 @@ init(State) ->
         {opts, rebar3_reltree_prv_bgate:option_spec()}
     ]),
     State1 = rebar_state:add_provider(State, Provider),
-    {ok, rebar_state:add_provider(State1, BadgeProvider)}.
+    State2 = rebar_state:add_provider(State1, BadgeProvider),
+    CheckVsnProvider = providers:create([
+        {name, checkvsn},
+        {namespace, reltree},
+        {module, rebar3_reltree_prv_checkvsn},
+        {example, "rebar3 reltree checkvsn"},
+        {short_desc, "Check local application version continuity."},
+        {desc, "Check local application version and tag continuity."},
+        {opts, rebar3_reltree_prv_checkvsn:option_spec()}
+    ]),
+    {ok, rebar_state:add_provider(State2, CheckVsnProvider)}.
 
 -spec dispatch_tree(map()) -> {ok, map()} | {error, term()}.
 dispatch_tree(Request) when is_map(Request) ->

@@ -18,16 +18,26 @@ read(ProjectPath) ->
         {ok, Head0} ->
             case command(ProjectPath, ["tag", "--merged", "HEAD"], #{}) of
                 {ok, Tags0} ->
-                    Origin = case command(ProjectPath,
-                                           ["config", "--get",
-                                            "remote.origin.url"], #{}) of
-                                 {ok, Url} -> {ok, Url};
-                                 {error, {exit, 1, _}} -> none;
-                                 {error, _} -> none
-                             end,
-                    {ok, #{head => trim(Head0),
-                           tags => lines(Tags0),
-                           origin => Origin}};
+                    case command(ProjectPath, ["tag", "--points-at", "HEAD"],
+                                 #{}) of
+                        {ok, HeadTags0} ->
+                            Origin = case command(ProjectPath,
+                                                   ["config", "--get",
+                                                    "remote.origin.url"], #{}) of
+                                         {ok, Url} -> {ok, Url};
+                                         {error, {exit, 1, _}} -> none;
+                                         {error, _} -> none
+                                     end,
+                            Tags = lines(Tags0),
+                            HeadTags = lines(HeadTags0),
+                            {ok, #{head => trim(Head0),
+                                   tags => Tags,
+                                   reachable_tags => Tags,
+                                   head_tags => HeadTags,
+                                   origin => Origin}};
+                        {error, Reason} ->
+                            {error, {git_head_tags, Reason}}
+                    end;
                 {error, Reason} ->
                     {error, {git_tags, Reason}}
             end;

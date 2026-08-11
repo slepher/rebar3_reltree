@@ -57,3 +57,41 @@ only_release_prerelease_forms_are_accepted_test() ->
     ?assertEqual([], maps:get(prerelease_tags,
                               rebar3_reltree_version:evaluate(
                                 "1.2.3", ["1.2.3-alpha.1"]))).
+
+checkvsn_groups_formal_versions_by_numeric_value_test() ->
+    {ok, Facts} = rebar3_reltree_version:check(
+                    "1.2.1",
+                    #{reachable_tags => ["v1.2.0", "1.2.0", "check-9.0.0",
+                                         "1.2.0-rc.1"],
+                      head_tags => []}),
+    ?assertEqual(next_patch, maps:get(continuity, Facts)),
+    ?assertEqual([#{version => {1, 2, 0},
+                    tags => ["1.2.0", "v1.2.0"]}],
+                 maps:get(formal_versions, Facts)),
+    ?assertEqual(["1.2.0", "v1.2.0"],
+                 maps:get(tags, maps:get(highest_formal, Facts))).
+
+checkvsn_accepts_initial_and_continuous_lines_test() ->
+    ?assertEqual(initial, continuity("8.4.12", [])),
+    ?assertEqual(same, continuity("1.2.0", ["1.2.0"])),
+    ?assertEqual(next_patch, continuity("1.2.1", ["1.2.0"])),
+    ?assertEqual(next_minor, continuity("1.3.0", ["1.2.9"])),
+    ?assertEqual(next_major, continuity("2.0.0", ["1.9.9"])).
+
+checkvsn_rejects_gaps_and_current_tag_mismatch_test() ->
+    ?assertMatch({error, {version_not_continuous, _}},
+                 rebar3_reltree_version:check(
+                   "1.2.2", #{reachable_tags => ["1.2.0"],
+                               head_tags => []})),
+    ?assertMatch({error, {current_tag_base_mismatch, _}},
+                 rebar3_reltree_version:check(
+                   "1.2.0", #{reachable_tags => ["1.2.0"],
+                               head_tags => ["1.1.0-rc.1"]})),
+    ?assertMatch({error, {invalid_app_version, _}},
+                 rebar3_reltree_version:check(
+                   "1.2", #{reachable_tags => [], head_tags => []})).
+
+continuity(App, Tags) ->
+    {ok, Facts} = rebar3_reltree_version:check(
+                    App, #{reachable_tags => Tags, head_tags => []}),
+    maps:get(continuity, Facts).

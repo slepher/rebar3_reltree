@@ -10,6 +10,7 @@
     read_report/1,
     cleanup/1,
     git_tag/2,
+    git_commit/2,
     add_origin/2,
     write_file/2
 ]).
@@ -61,6 +62,11 @@ read_report(Request) ->
 
 git_tag(Root, Tag) ->
     ok = git_run(Root, ["tag", Tag]),
+    ok.
+
+git_commit(Root, Message) ->
+    ok = git_run(Root, ["add", "."]),
+    ok = git_run(Root, ["commit", "-qm", Message]),
     ok.
 
 add_origin(Root, Url) ->
