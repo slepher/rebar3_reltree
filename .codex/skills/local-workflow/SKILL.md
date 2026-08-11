@@ -169,12 +169,13 @@ invalidation reason, or modify completed tasks to repair checkpoint prose.
 
 Before creating a formal design plan, have Sol write the next `plan-N.md` as
 `Plan status: draft` in the user's language. When an earlier plan exists, state
-`Supersedes: plan-K.md` and the last materialized task. If the prior plan has an
-unfinished materialized task M, begin the new plan at task M+1; otherwise begin
-after the highest materialized task. Ignore unmaterialized future proposals in
-the old plan when choosing the next number. Preserve task M and its artifacts as
+`Supersedes: plan-K.md` and `Previous task: task-M`. Task M is the last task
+actually selected under the prior plan, whether it passed, remains in progress,
+is in rework, or is blocked. Begin the new plan at task M+1; never calculate the
+number from the last completed or passed task. Ignore future task proposals that
+were never selected under the old plan. Preserve task M and its artifacts as
 history, and assign any usable attributable partial work to the first new task.
-The dispatcher then:
+If no task was ever selected, begin at task 1. The dispatcher then:
 
 1. sets `Draft plan: plan-N.md`, enters `plan_review`, and sets no current
    implementation task; retain the prior `Active plan` until approval;
