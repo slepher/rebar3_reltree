@@ -70,8 +70,8 @@ does not replace worker-authored evidence with its own technical conclusion.
 
 Keep these initiative artifacts:
 
-- `plan.md`: Goal, normative inputs, constraints, dependencies, and ordered
-  small tasks;
+- `plan.md`: Goal, normative inputs, constraints, dependencies, ordered small
+  tasks, and `Plan status: draft | accepted`;
 - `status.md`: current repository snapshot, task, phase, evidence, blocker, and
   one exact next action;
 - `commit.md`: append-only index of code commits by task and review correction;
@@ -82,6 +82,11 @@ Keep these initiative artifacts:
 
 The dispatcher writes `status.md` and `commit.md`; Sol writes plans, tasks, and
 reviews. Never overwrite or renumber an existing task or review artifact.
+
+Write `plan.md` in the primary language used by the user for the current Goal,
+or in an explicitly requested language. Keep code identifiers, commands, paths,
+and quoted specification terms exact. Do not translate historical artifacts
+merely for consistency during recovery.
 
 `commit.md` exists for recovery and code-history inspection, not task
 execution. Do not send it to coding workers. Record only commits that change
@@ -110,7 +115,7 @@ rewrite completed task history merely to normalize old records.
 Use one phase:
 
 ```text
-planning | task_planning | coding | coding_self_test | review |
+planning | plan_review | task_planning | coding | coding_self_test | review |
 rework | optional_verification | committing | handoff | blocked | complete
 ```
 
@@ -148,6 +153,27 @@ Exact Next Action:
 Do not redispatch an apparently unstarted task when attributable implementation
 already exists. Do not discard partial work, rerun completed gates without an
 invalidation reason, or modify completed tasks to repair checkpoint prose.
+
+## Require user approval for the plan
+
+Before creating a formal plan, have Sol write `plan.md` as `Plan status: draft`
+in the user's language. The dispatcher then:
+
+1. sets status to `plan_review` with no current implementation task;
+2. presents the draft plan and its task boundaries to the user;
+3. stops without writing a task contract, dispatching coding, or treating the
+   plan as accepted.
+
+Proceed only after the user explicitly approves the draft. If the user requests
+changes, return them to Sol, revise the draft, and repeat the review pause. On
+approval, have Sol change only the plan status and approved corrections to
+`accepted`; then let the dispatcher enter `task_planning`.
+
+Return a material plan revision to `draft` before affected work starts. Adding,
+removing, splitting, merging, reordering, or changing the behavior of unfinished
+tasks is material and requires another user review pause. Recovery-only status
+reconciliation and coder-facing review corrections do not reopen an otherwise
+unchanged accepted plan.
 
 ## Plan small tasks
 
