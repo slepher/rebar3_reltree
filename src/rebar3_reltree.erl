@@ -1,6 +1,6 @@
 -module(rebar3_reltree).
 
--export([init/1, dispatch_tree/1, dispatch_bgate/1, main/1]).
+-export([init/1, main/1]).
 
 -spec init(term()) -> {ok, term()}.
 init(State) ->
@@ -34,14 +34,6 @@ init(State) ->
         {opts, rebar3_reltree_prv_checkvsn:option_spec()}
     ]),
     {ok, rebar_state:add_provider(State2, CheckVsnProvider)}.
-
--spec dispatch_tree(map()) -> {ok, map()} | {error, term()}.
-dispatch_tree(Request) when is_map(Request) ->
-    rebar3_reltree_project:generate(Request).
-
--spec dispatch_bgate(map()) -> {ok, map()} | {error, term()}.
-dispatch_bgate(Request) when is_map(Request) ->
-    rebar3_reltree_badge:run(Request).
 
 -spec main([string()]) -> no_return().
 main(Args) ->

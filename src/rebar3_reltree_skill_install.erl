@@ -10,26 +10,27 @@
 -define(STAGE_PREFIX, ".reltree-stage-").
 -define(BACKUP_PREFIX, ".reltree-backup-").
 
--spec resolve_destination(map() | list(), fun((string()) -> term())) ->
+-spec resolve_destination(map(), fun((string()) -> term())) ->
     {ok, string()} | {error, term()}.
-resolve_destination(Options, EnvFun) when is_function(EnvFun, 1) ->
-    case option_value(dest, Options) of
+resolve_destination(Options, EnvFun)
+  when is_map(Options), is_function(EnvFun, 1) ->
+    case maps:find(dest, Options) of
         {ok, Dest} when is_list(Dest), Dest =/= [] ->
             {ok, filename:absname(Dest)};
         {ok, Dest} ->
             {error, {invalid_destination, Dest}};
-        absent ->
+        error ->
             case environment_value("CODEX_HOME", EnvFun) of
                 {ok, CodexHome} ->
                     {ok, filename:absname(filename:join(CodexHome,
                                                         "skills"))};
                 absent ->
-                    case first_environment_value(["HOME", "USERPROFILE"],
-                                                 EnvFun) of
+                    case environment_value("HOME", EnvFun) of
                         {ok, Home} ->
                             {ok, filename:absname(filename:join(
                                                        [Home, ".codex",
                                                         "skills"]))};
+                        absent -> {error, unavailable};
                         {error, Reason} -> {error, Reason}
                     end;
                 {error, Reason} ->
@@ -67,8 +68,8 @@ install_paths(Source, Parent, Target, Force) ->
                             case ensure_parent_directory(Parent) of
                                 ok ->
                                     case preflight_target(Target, Force) of
-                                        ok -> stage(Source, Parent, Target,
-                                                    Force, Files);
+                                        ok -> stage(Parent, Target, Force,
+                                                    Files);
                                         {error, {target_conflict, Reason}} ->
                                             install_error(target_conflict,
                                                           Target, Reason);
@@ -113,10 +114,12 @@ preflight_target(Target, false) ->
         {error, Reason} -> {error, {target, Reason}}
     end.
 
-stage(Source, Parent, Target, Force, Files) ->
-    case create_stage(Parent) of
+stage(Parent, Target, Force, Files) ->
+    {SkillBytes, AgentBytes} = Files,
+    case create_owned_directory(Parent, ?STAGE_PREFIX, 0) of
         {ok, Stage} ->
-            case copy_stage(Source, Stage, Files) of
+            case copy_stage_files(filename:join(Stage, "agents"), Stage,
+                                  SkillBytes, AgentBytes) of
                 ok ->
                     case validate_stage(Stage, Files) of
                         ok -> activate(Stage, Parent, Target, Force);
@@ -133,10 +136,8 @@ stage(Source, Parent, Target, Force, Files) ->
             install_error(stage_create, Parent, Reason)
     end.
 
-create_stage(Parent) ->
-    create_owned_directory(Parent, ?STAGE_PREFIX, 0).
-
-create_owned_directory(_Parent, _Prefix, Attempts) when Attempts >= 128 ->
+create_owned_directory(_Parent, _Prefix, Attempts)
+  when Attempts >= ?MAX_NAME_ATTEMPTS ->
     {error, name_allocation_exhausted};
 create_owned_directory(Parent, Prefix, Attempts) ->
     Path = sibling_path(Parent, Prefix),
@@ -147,10 +148,6 @@ create_owned_directory(Parent, Prefix, Attempts) ->
         {error, Reason} ->
             {error, {Path, Reason}}
     end.
-
-copy_stage(_Source, Stage, {SkillBytes, AgentBytes}) ->
-    Agents = filename:join(Stage, "agents"),
-    copy_stage_files(Agents, Stage, SkillBytes, AgentBytes).
 
 copy_stage_files(Agents, Stage, SkillBytes, AgentBytes) ->
     case file:make_dir(Agents) of
@@ -249,7 +246,7 @@ activate(Stage, Parent, Target, true) ->
                 {ok, ActualBackup} ->
                     case rename_path(Stage, Target, replace) of
                         ok ->
-                            case cleanup_owned(ActualBackup) of
+                            case remove_owned(ActualBackup) of
                                 ok -> {ok, Target};
                                 {error, Reason} ->
                                     install_error(cleanup, ActualBackup,
@@ -300,7 +297,7 @@ rename_backup(Target, Parent, Attempts) ->
 rollback(Stage, Target, Backup, ReplaceReason) ->
     case rename_path(Backup, Target, rollback) of
         ok ->
-            case cleanup_owned(Stage) of
+            case remove_owned(Stage) of
                 ok -> install_error(replace, Target, ReplaceReason);
                 {error, CleanupReason} ->
                     install_error(rollback, Stage,
@@ -308,7 +305,7 @@ rollback(Stage, Target, Backup, ReplaceReason) ->
                                    {stage_cleanup, CleanupReason}})
             end;
         {error, RollbackReason} ->
-            case cleanup_owned(Stage) of
+            case remove_owned(Stage) of
                 ok ->
                     install_error(rollback, Backup,
                                   {replace, ReplaceReason, RollbackReason});
@@ -328,14 +325,11 @@ rename_path(From, To, Phase) ->
     end.
 
 cleanup_after_error(Path, Original) ->
-    case cleanup_owned(Path) of
+    case remove_owned(Path) of
         ok -> Original;
         {error, Reason} ->
             install_error(cleanup, Path, {original, Original, Reason})
     end.
-
-cleanup_owned(Path) ->
-    remove_owned(Path).
 
 remove_owned(Path) ->
     case file:read_link_info(Path) of
@@ -538,33 +532,12 @@ sibling_path(Parent, Prefix) ->
     Token = integer_to_list(erlang:unique_integer([positive, monotonic])),
     filename:join(Parent, Prefix ++ Token).
 
-option_value(Key, Options) when is_map(Options) ->
-    case maps:find(Key, Options) of
-        {ok, Value} -> {ok, Value};
-        error -> absent
-    end;
-option_value(Key, Options) when is_list(Options) ->
-    case lists:keyfind(Key, 1, Options) of
-        {Key, Value} -> {ok, Value};
-        false -> absent
-    end;
-option_value(_Key, _Options) ->
-    absent.
-
 environment_value(Name, EnvFun) ->
     case EnvFun(Name) of
         false -> absent;
         [] -> {error, empty};
         Value when is_list(Value) -> {ok, Value};
         Value -> {error, {invalid_value, Value}}
-    end.
-
-first_environment_value([], _EnvFun) ->
-    {error, unavailable};
-first_environment_value([Name | Rest], EnvFun) ->
-    case environment_value(Name, EnvFun) of
-        absent -> first_environment_value(Rest, EnvFun);
-        Result -> Result
     end.
 
 %% Tests set this process-local marker directly; there is no production

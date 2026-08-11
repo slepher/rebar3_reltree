@@ -56,7 +56,7 @@ classify(_Declaration) ->
 %% The parser is deliberately a small line parser for the exact renderer
 %% format.  It never consults terms, creates atoms from bytes, or evaluates
 %% input from the previous report.
--spec parse_prior(binary()) -> {ok, legacy | map()} | {error, term()}.
+-spec parse_prior(binary()) -> {ok, map()} | {error, term()}.
 parse_prior(Bytes) when is_binary(Bytes), byte_size(Bytes) =< ?MAX_PRIOR_BYTES ->
     case unicode:characters_to_list(Bytes, utf8) of
         Lines when is_list(Lines) ->
@@ -76,7 +76,6 @@ prior_context(true, _Output) ->
 prior_context(auto, Output) ->
     case read_prior(Output) of
         missing -> {ok, #{}, []};
-        {ok, legacy} -> {ok, #{}, []};
         {ok, Entries} -> {ok, Entries, []};
         {error, Reason} ->
             {ok, #{}, [prior_warning(Output, Reason)]}
@@ -94,7 +93,6 @@ read_prior(Output) ->
             case file:read_file(Output) of
                 {ok, Bytes} ->
                     case parse_prior(Bytes) of
-                        {ok, legacy} -> {ok, legacy};
                         {ok, #{entries := Entries}} -> {ok, Entries};
                         {error, _} = Error -> Error
                     end;
@@ -115,13 +113,9 @@ bounded_prior_reason(duplicate_identity) -> duplicate_identity;
 bounded_prior_reason(_Other) -> malformed.
 
 parse_prior_lines(Lines) ->
-    case lists:member("- format_version: 1", Lines) of
-        true -> {ok, legacy};
-        false ->
-            case lists:member("- format_version: 2", Lines) of
-                true -> parse_records(Lines, none, #{});
-                false -> {error, unsupported_version}
-            end
+    case lists:member("- format_version: 2", Lines) of
+        true -> parse_records(Lines, none, #{});
+        false -> {error, unsupported_version}
     end.
 
 parse_records([], _CurrentPath, Entries) ->

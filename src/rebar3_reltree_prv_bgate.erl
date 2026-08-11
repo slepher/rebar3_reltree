@@ -18,7 +18,7 @@ option_spec() ->
 do(State) ->
     case request(State) of
         {ok, Request} ->
-            case rebar3_reltree:dispatch_bgate(Request) of
+            case rebar3_reltree_badge:run(Request) of
                 {error, Reason} -> provider_error(Reason);
                 {ok, Result} ->
                     io:put_chars(rebar3_reltree_badge:format_result(Result)),

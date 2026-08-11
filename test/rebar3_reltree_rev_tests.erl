@@ -244,7 +244,7 @@ stale_and_missing_revisions_lower_status_reasons_test() ->
     rebar3_reltree_fixtures:cleanup(output_root(Output)).
 
 legacy_and_malformed_prior_are_bounded_test() ->
-    ?assertEqual({ok, legacy},
+    ?assertEqual({error, unsupported_version},
                  rebar3_reltree_rev:parse_prior(
                    <<"# reltree project\n- format_version: 1\n">>)),
     ?assertMatch({error, _},

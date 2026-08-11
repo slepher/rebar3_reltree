@@ -18,7 +18,7 @@ option_spec() ->
 do(State) ->
     case request_from_state(State) of
         {ok, Request} ->
-            case rebar3_reltree:dispatch_tree(Request) of
+            case rebar3_reltree_project:generate(Request) of
                 {error, Reason} -> provider_error(Reason);
                 {ok, _Result} -> {ok, State}
             end;

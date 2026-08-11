@@ -1,16 +1,12 @@
 -module(rebar3_reltree_cli).
 
--export([main/1, run/1, run/2, help/1]).
+-export([main/1, run/2]).
 
 -spec main([string()]) -> no_return().
 main(Args) ->
-    {Exit, Output} = run(Args),
+    {Exit, Output} = run(Args, #{}),
     io:put_chars(Output),
     erlang:halt(Exit).
-
--spec run([string()]) -> {non_neg_integer(), iolist()}.
-run(Args) ->
-    run(Args, #{}).
 
 -spec run([string()], map()) -> {non_neg_integer(), iolist()}.
 run(Args, Context) when is_list(Args), is_map(Context) ->
@@ -45,7 +41,7 @@ parse([Command | _]) ->
     {error, {invalid_command, Command}}.
 
 parse_install_args([], Options) ->
-    {ok, Options#{command => skill_install}};
+    {ok, Options};
 parse_install_args(["--force" | Rest], #{force := false} = Options) ->
     parse_install_args(Rest, Options#{force => true});
 parse_install_args(["--force" | _], _Options) ->
@@ -65,7 +61,7 @@ parse_install_args(["--dest", [] | _], _Options) ->
 parse_install_args([Option | _], _Options) when is_list(Option),
                                                Option =/= [],
                                                hd(Option) =:= $- ->
-    {error, {invalid_option, option_name(Option), Option}};
+    {error, {invalid_option, Option, Option}};
 parse_install_args([Argument | _], _Options) ->
     {error, {extra_argument, Argument}}.
 
@@ -93,30 +89,13 @@ resolve_parent(#{dest := Dest}, _Context) ->
     rebar3_reltree_skill_install:resolve_destination(
       #{dest => Dest}, fun(_Name) -> erlang:error(unexpected_environment_read) end);
 resolve_parent(Request, Context) ->
-    Env = maps:get(env, Context,
-                   fun(Name) -> context_environment(Name, Context) end),
-    case rebar3_reltree_skill_install:resolve_destination(
-           Request, normalize_environment(Env)) of
+    Env = maps:get(env, Context, fun(Name) -> os:getenv(Name) end),
+    case rebar3_reltree_skill_install:resolve_destination(Request, Env) of
         {ok, Parent} ->
             {ok, Parent};
         {error, Reason} ->
             {error, {install, parent, "destination", Reason}}
     end.
-
-normalize_environment(Env) when is_function(Env, 1) ->
-    Env;
-normalize_environment(Env) when is_map(Env) ->
-    fun(Name) -> maps:get(Name, Env, false) end;
-normalize_environment(_Env) ->
-    fun(_Name) -> false end.
-
-context_environment("HOME", Context) ->
-    case maps:find(user_home, Context) of
-        {ok, Home} -> Home;
-        error -> os:getenv("HOME")
-    end;
-context_environment(Name, _Context) ->
-    os:getenv(Name).
 
 packaged_source(Context) ->
     case maps:find(priv_dir, Context) of
@@ -161,5 +140,3 @@ path_text(Path) when is_list(Path) ->
     Path;
 path_text(Path) ->
     io_lib:format("~p", [Path]).
-
-option_name(Option) -> Option.

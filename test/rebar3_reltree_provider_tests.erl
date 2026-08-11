@@ -14,6 +14,11 @@ provider_registration_test() ->
     ?assert(contains_term(Providers, rebar3_reltree_prv_checkvsn)),
     ?assertNot(contains_term(Providers, skill)).
 
+provider_root_has_no_historical_dispatch_exports_test() ->
+    Exports = rebar3_reltree:module_info(exports),
+    ?assertNot(lists:member({dispatch_tree, 1}, Exports)),
+    ?assertNot(lists:member({dispatch_bgate, 1}, Exports)).
+
 provider_metadata_test() ->
     Spec = rebar3_reltree_prv_tree:option_spec(),
     ?assertMatch([{scan_roots, _, "scan-roots", string, _},
@@ -117,7 +122,8 @@ provider_help_is_local_to_adapters_test() ->
     BgateHelp = lists:flatten(rebar3_reltree_prv_bgate:help()),
     ?assert(string:str(TreeHelp, "--scan-roots") > 0),
     ?assert(string:str(BgateHelp, "--check") > 0),
-    TopHelp = lists:flatten(rebar3_reltree_cli:help(top)),
+    {0, TopHelp0} = rebar3_reltree_cli:run(["--help"], #{}),
+    TopHelp = lists:flatten(TopHelp0),
     ?assertEqual(0, string:str(TopHelp, "tree   inspect")),
     ?assertEqual(0, string:str(TopHelp, "bgate  ")).
 

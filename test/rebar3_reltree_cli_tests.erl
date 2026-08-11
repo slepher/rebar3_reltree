@@ -17,6 +17,13 @@ top_help_is_bare_installer_only_test() ->
     ?assertEqual(0, string:str(Text, "checkvsn ")),
     ?assertNot(filelib:is_dir(Root)).
 
+cli_exports_keep_only_entry_and_test_seam_test() ->
+    Exports = rebar3_reltree_cli:module_info(exports),
+    ?assert(lists:member({main, 1}, Exports)),
+    ?assert(lists:member({run, 2}, Exports)),
+    ?assertNot(lists:member({run, 1}, Exports)),
+    ?assertNot(lists:member({help, 1}, Exports)).
+
 retired_skill_command_is_a_usage_error_test() ->
     Root = unique_root(),
     {Exit, Output} = rebar3_reltree_cli:run(["skill", "--help"],
