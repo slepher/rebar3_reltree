@@ -1,7 +1,7 @@
 -module(rebar3_reltree_prv_tree).
 -behaviour(provider).
 
--export([init/1, do/1, format_error/1, option_spec/0, request/1]).
+-export([init/1, do/1, format_error/1, option_spec/0, request/1, help/0]).
 
 -spec init(term()) -> {ok, term()}.
 init(State) ->
@@ -23,7 +23,7 @@ do(State) ->
                 {ok, _Result} -> {ok, State}
             end;
         {help, Kind} ->
-            io:put_chars(rebar3_reltree_cli:help(Kind)),
+            io:put_chars(help_for(Kind)),
             {ok, State};
         {error, Reason} ->
             provider_error(Reason)
@@ -79,3 +79,14 @@ active_profile(Profiles) ->
 
 provider_error(Reason) ->
     {error, {?MODULE, Reason}}.
+
+help() ->
+    help_for(tree).
+
+help_for(tree) ->
+    ["Usage: reltree tree [options]\n\n",
+     "Options:\n",
+     "  --scan-roots PATH[:deep]  repeatable; replaces configured roots\n",
+     "  --rev false|auto|true     revision lookup policy\n\n",
+     "Defaults: scan root '..' shallow; rev auto.\n",
+     "Output: _build/<profile>/reltree/project.md\n"].

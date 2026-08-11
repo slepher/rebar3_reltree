@@ -1,7 +1,7 @@
 -module(rebar3_reltree_prv_bgate).
 -behaviour(provider).
 
--export([init/1, do/1, format_error/1, option_spec/0, request/1]).
+-export([init/1, do/1, format_error/1, option_spec/0, request/1, help/0]).
 
 -spec init(term()) -> {ok, term()}.
 init(State) ->
@@ -25,7 +25,7 @@ do(State) ->
                     {ok, State}
             end;
         {help, bgate} ->
-            io:put_chars(rebar3_reltree_cli:help(bgate)),
+            io:put_chars(help()),
             {ok, State};
         {error, Reason} ->
             provider_error(Reason)
@@ -57,3 +57,9 @@ request(State) ->
 
 provider_error(Reason) ->
     {error, {?MODULE, Reason}}.
+
+help() ->
+    ["Usage: reltree bgate [options]\n\n",
+     "Options (exactly one required):\n",
+     "  --check  verify local README CI badges\n",
+     "  --write  update local README CI badges\n"].

@@ -9,12 +9,12 @@
 
 ## Current phase
 
-- Phase: `committing`
+- Phase: `plan_review`
 - Active plan: `plan-1.md`
-- Draft plan: `none`
-- Current task: `task-5`
-- Implementation stage: `task-5 passed review 2; recording final review checkpoint`
-- Next action: commit review-2 artifact, status and final task-5 ledger, then have Sol write task-6.md.
+- Draft plan: `plan-2.md`
+- Current task: `none`
+- Implementation stage: user review of replacement plan draft
+- Next action: obtain explicit user approval or requested corrections for `plan-2.md`; do not dispatch coding before approval.
 
 ## Repository snapshot
 
@@ -124,7 +124,17 @@
 - Sol review 2 passed commits `85a1b8e` and `bfd3c04` with no material finding; review artifact is
   `task-5-code-review-2.md`. The review confirms the correction completed the five independent
   version-continuity rejection assertions without changing product logic or scope.
+- task-6 recovery: Sol confirmed the partial diff remains attributable to task-6 and does not require
+  plan refinement. Valid partial evidence: compile 0; installer EUnit 11/0; CLI EUnit 8/0; provider
+  EUnit 13/0; badge EUnit 13/0; escriptize 0; exact two-file archive; first install/conflict/force and
+  target byte/entry/stage-backup checks passed. Evidence before final loader/packaging changes, the
+  final full suite, packaged boundary/precedence/failure/no-write checks, and strict path proof is invalid
+  or missing; no task-6 commit exists.
+- Recovery revision: repeated interruption at the combined installer/packaging/CLI/full-acceptance boundary
+  superseded task-6 before completion. Partial work is preserved; task-9 will finish installer/resource
+  domain and task-10 will finish installer-only escript/CLI and final packaging acceptance, in that order,
+  before the planned badge and skill tasks.
 
 ## Blocker
 
-- None. Task-3 is complete locally; task-4 planning is next.
+- None. task-6 is superseded before completion with attributable partial work; task-9 planning is active.

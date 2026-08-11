@@ -27,9 +27,11 @@ provider_and_cli_surface(_Config) ->
         rebar3_reltree_fixtures:cleanup(Root),
         Root2 = rebar3_reltree_fixtures:new_root(),
         try
-            rebar3_reltree_fixtures:write_project(
+        rebar3_reltree_fixtures:write_project(
               Root2, ct_cli, [], "0.1.0"),
-            {0, []} = rebar3_reltree_cli:run(["tree"], #{cwd => Root2}),
+            State3 = rebar_state:dir(rebar_state:new([]), Root2),
+            State4 = rebar_state:command_args(State3, ["tree"]),
+            {ok, State4} = rebar3_reltree_prv_tree:do(State4),
             ?assert(filelib:is_regular(filename:join(
                        [Root2, "_build", "default", "reltree", "project.md"])))
         after
@@ -123,10 +125,11 @@ bgate_surface(_Config) ->
           <<"name: ci\n">>),
         README = filename:join(Root, "README.md"),
         rebar3_reltree_fixtures:write_file(README, <<"content\n">>),
-        {0, []} = rebar3_reltree_cli:run(["bgate", "--write"],
-                                          #{cwd => Root}),
-        {0, []} = rebar3_reltree_cli:run(["bgate", "--check"],
-                                          #{cwd => Root}),
+        State0 = rebar_state:dir(rebar_state:new([]), Root),
+        WriteState = rebar_state:command_args(State0, ["bgate", "--write"]),
+        CheckState = rebar_state:command_args(State0, ["bgate", "--check"]),
+        {ok, WriteState} = rebar3_reltree_prv_bgate:do(WriteState),
+        {ok, CheckState} = rebar3_reltree_prv_bgate:do(CheckState),
         {ok, Bytes} = file:read_file(README),
         ?assertMatch({_, _}, binary:match(Bytes, <<"master CI">>)),
         ?assertNot(filelib:is_regular(filename:join(Root, "project.md")))

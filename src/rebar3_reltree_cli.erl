@@ -1,6 +1,6 @@
 -module(rebar3_reltree_cli).
 
--export([main/1, run/1, run/2, help/1, load_config/1]).
+-export([main/1, run/1, run/2, help/1]).
 
 -spec main([string()]) -> no_return().
 main(Args) ->
@@ -10,115 +10,195 @@ main(Args) ->
 
 -spec run([string()]) -> {non_neg_integer(), iolist()}.
 run(Args) ->
-    case file:get_cwd() of
-        {ok, Cwd} -> run(Args, #{cwd => Cwd});
-        {error, Reason} ->
-            {2, ["reltree: ", rebar3_reltree_request:format_error(
-                              {config_read, ".", Reason}), "\n"]}
-    end.
+    run(Args, #{}).
 
 -spec run([string()], map()) -> {non_neg_integer(), iolist()}.
-run(Args, Context0) when is_list(Args), is_map(Context0) ->
-    case rebar3_reltree_request:parse_cli(Args) of
+run(Args, Context) when is_list(Args), is_map(Context) ->
+    case parse(Args) of
         {help, Kind} ->
             {0, help(Kind)};
         {error, Reason} ->
             {2, error_output(Reason)};
-        {ok, Cli} ->
-            case maps:get(command, Cli, tree) of
-                bgate ->
-                    run_bgate(Cli, Context0);
-                tree ->
-                    run_tree(Cli, Context0)
-            end
+        {ok, Request} ->
+            run_install(Request, Context)
     end.
 
--spec help(top | tree | bgate) -> iolist().
+-spec help(top | skill) -> iolist().
 help(top) ->
-    ["Usage: reltree <command> [options]\n\n",
-    "Commands:\n",
-     "  tree   inspect the local project tree\n",
-     "  bgate  check or update local CI badges\n\n",
-     "Run 'reltree tree --help' or 'reltree bgate --help' for options.\n"];
-help(tree) ->
-    ["Usage: reltree tree [options]\n\n",
+    ["Usage: reltree skill --install [--dest DIR] [--force]\n\n",
+     "Commands:\n",
+     "  skill --install  install the packaged reltree skill\n\n",
+     "Run 'reltree skill --help' for help.\n"];
+help(skill) ->
+    ["Usage: reltree skill --install [--dest DIR] [--force]\n\n",
      "Options:\n",
-     "  --scan-roots PATH[:deep]  repeatable; replaces configured roots\n",
-     "  --rev false|auto|true     revision lookup policy\n\n",
-     "Defaults: scan root '..' shallow; rev auto.\n",
-     "Output: _build/<profile>/reltree/project.md\n"];
+     "  --dest DIR  install below DIR/reltree\n",
+     "  --force     replace an existing reltree skill\n"].
 
-help(bgate) ->
-    ["Usage: reltree bgate [options]\n\n",
-     "Options (exactly one required):\n",
-     "  --check  verify local README CI badges\n",
-     "  --write  update local README CI badges\n"].
+parse([]) ->
+    {help, top};
+parse(["--help"]) ->
+    {help, top};
+parse(["-h"]) ->
+    {help, top};
+parse(["skill", "--help"]) ->
+    {help, skill};
+parse(["skill", "-h"]) ->
+    {help, skill};
+parse(["skill", "--install" | Args]) ->
+    parse_install_args(Args, #{force => false});
+parse([Command | _]) ->
+    {error, {invalid_command, Command}}.
 
--spec load_config(string()) -> {ok, list()} | {error, term()}.
-load_config(Cwd) ->
-    Path = filename:join(Cwd, "rebar.config"),
-    case file:consult(Path) of
-        {ok, Terms} ->
-            rebar3_reltree_request:extract_config(Terms);
-        {error, enoent} ->
-            {ok, []};
-        {error, {enoent, _}} ->
-            {ok, []};
-        {error, Reason} ->
-            {error, {config_read, Path, Reason}}
-    end.
+parse_install_args([], Options) ->
+    {ok, Options#{command => skill_install}};
+parse_install_args(["--force" | Rest], #{force := false} = Options) ->
+    parse_install_args(Rest, Options#{force => true});
+parse_install_args(["--force" | _], _Options) ->
+    {error, {duplicate_option, force}};
+parse_install_args(["--dest"], _Options) ->
+    {error, {missing_option_value, dest}};
+parse_install_args(["--dest", Value | _Rest], #{dest := _} = _Options)
+  when Value =/= [] ->
+    {error, {duplicate_option, dest}};
+parse_install_args(["--dest", Value | Rest], Options) when Value =/= [] ->
+    case lists:prefix("--", Value) of
+        true -> {error, {missing_option_value, dest}};
+        false -> parse_install_args(Rest, Options#{dest => Value})
+    end;
+parse_install_args(["--dest", [] | _], _Options) ->
+    {error, {invalid_option, dest, []}};
+parse_install_args([Option | _], _Options) when is_list(Option),
+                                               Option =/= [],
+                                               hd(Option) =:= $- ->
+    {error, {invalid_option, option_name(Option), Option}};
+parse_install_args([Argument | _], _Options) ->
+    {error, {extra_argument, Argument}}.
 
-config_for(Context) ->
-    case maps:find(config_options, Context) of
-        {ok, Config} ->
-            rebar3_reltree_request:extract_config([{reltree, Config}]);
-        error ->
-            case maps:find(cwd, Context) of
-                {ok, Cwd} -> load_config(Cwd);
-                error -> {error, {invalid_context, cwd, missing}}
-            end
-    end.
-
-error_output(Reason) ->
-    ["reltree: ", rebar3_reltree_request:format_error(Reason), "\n"].
-
-run_tree(Cli, Context0) ->
-    case config_for(Context0) of
-        {ok, ConfigOptions} ->
-            Context = maps:merge(
-                #{project_root => maps:get(cwd, Context0, "."),
-                  build_base_dir => filename:join(
-                    [maps:get(cwd, Context0, "."), "_build", "default"]),
-                  profile => default,
-                  cli_scan_roots => maps:get(cli_scan_roots, Cli),
-                  cli_rev => maps:get(cli_rev, Cli)}, Context0),
-            case rebar3_reltree_request:normalize(
-                   Context#{config_options => ConfigOptions}) of
-                {ok, Request} ->
-                    case rebar3_reltree:dispatch_tree(Request) of
+run_install(Request, Context) ->
+    case resolve_parent(Request, Context) of
+        {ok, Parent} ->
+            case packaged_source(Context) of
+                {ok, Source} ->
+                    Options = maps:get(installer_options, Context, #{}),
+                    Result = rebar3_reltree_skill_install:install(
+                               Source, Parent, maps:get(force, Request),
+                               Options),
+                    case Result of
+                        {ok, Target} ->
+                            {0, ["reltree skill installed at ", Target, "\n"]};
                         {error, Reason} ->
-                            {1, error_output(Reason)};
-                        {ok, _Result} ->
-                            {0, []}
+                            {1, error_output(Reason)}
                     end;
                 {error, Reason} ->
-                    {2, error_output(Reason)}
+                    {1, error_output(Reason)}
             end;
         {error, Reason} ->
-            {2, error_output(Reason)}
+            {1, error_output(Reason)}
     end.
 
-run_bgate(Cli, Context0) ->
-    Cwd = maps:get(cwd, Context0, "."),
-    case rebar3_reltree_request:normalize_bgate(
-           #{cwd => Cwd, mode => maps:get(mode, Cli)}) of
-        {ok, Request} ->
-            case rebar3_reltree:dispatch_bgate(Request) of
+resolve_parent(#{dest := Dest}, _Context) ->
+    {ok, filename:absname(Dest)};
+resolve_parent(_Request, Context) ->
+    Env = maps:get(env, Context, fun os:getenv/1),
+    case environment_value("CODEX_HOME", Env) of
+        {ok, CodexHome} ->
+            {ok, filename:absname(filename:join(CodexHome, "skills"))};
+        absent ->
+            case user_home(Context) of
+                {ok, Home} ->
+                    {ok, filename:absname(filename:join([Home, ".codex",
+                                                         "skills"]))};
                 {error, Reason} ->
-                    {1, error_output(Reason)};
-                {ok, Result} ->
-                    {0, rebar3_reltree_badge:format_result(Result)}
+                    {error, {install, parent, "user-home", Reason}}
             end;
         {error, Reason} ->
-            {2, error_output(Reason)}
+            {error, {install, parent, "CODEX_HOME", Reason}}
     end.
+
+environment_value(Name, Env) when is_function(Env, 1) ->
+    case Env(Name) of
+        false -> absent;
+        [] -> {error, empty};
+        Value when is_list(Value) -> {ok, Value};
+        Value -> {error, {invalid_value, Value}}
+    end;
+environment_value(Name, Env) when is_map(Env) ->
+    environment_value(Name, fun(Key) -> maps:get(Key, Env, false) end);
+environment_value(_Name, _Env) ->
+    {error, invalid_environment_source}.
+
+user_home(Context) ->
+    case maps:find(user_home, Context) of
+        {ok, Home} when is_list(Home), Home =/= [] ->
+            {ok, Home};
+        {ok, []} ->
+            {error, empty};
+        {ok, Value} ->
+            {error, {invalid_value, Value}};
+        error ->
+            user_home_from_os()
+    end.
+
+user_home_from_os() ->
+    case os:getenv("HOME") of
+        false ->
+            case os:getenv("USERPROFILE") of
+                false -> {error, unavailable};
+                [] -> {error, empty};
+                Home when is_list(Home) -> {ok, Home};
+                Value -> {error, {invalid_value, Value}}
+            end;
+        [] ->
+            {error, empty};
+        Home when is_list(Home) ->
+            {ok, Home};
+        Value ->
+            {error, {invalid_value, Value}}
+    end.
+
+packaged_source(Context) ->
+    case maps:find(priv_dir, Context) of
+        {ok, PrivDir} when is_list(PrivDir), PrivDir =/= [] ->
+            {ok, filename:join(filename:absname(PrivDir),
+                               "skills/reltree")};
+        {ok, Value} ->
+            {error, {install, source_validation, "priv_dir",
+                     {invalid_value, Value}}};
+        error ->
+            case code:priv_dir(rebar3_reltree) of
+                PrivDir when is_list(PrivDir) ->
+                    {ok, filename:join(filename:absname(PrivDir),
+                                       "skills/reltree")};
+                {error, Reason} ->
+                    {error, {install, source_validation,
+                             "code:priv_dir(rebar3_reltree)", Reason}}
+            end
+    end.
+
+error_output({install, Stage, Path, Reason}) ->
+    ["reltree: install ", atom_to_list(Stage), " at ", path_text(Path),
+     ": ", io_lib:format("~p", [Reason]), "\n"];
+error_output({invalid_command, Command}) ->
+    ["reltree: unknown command ", io_lib:format("~p", [Command]),
+     "; use 'skill --install'\n"];
+error_output({invalid_option, Option, Value}) ->
+    ["reltree: invalid option ", io_lib:format("~p", [Option]),
+     " value ", io_lib:format("~p", [Value]), "\n"];
+error_output({missing_option_value, Option}) ->
+    ["reltree: option --", atom_to_list(Option), " requires a value\n"];
+error_output({duplicate_option, Option}) ->
+    ["reltree: option --", atom_to_list(Option),
+     " may be specified only once\n"];
+error_output({extra_argument, Argument}) ->
+    ["reltree: unexpected argument ", io_lib:format("~p", [Argument]),
+     "\n"];
+error_output(Reason) ->
+    ["reltree: ", io_lib:format("~p", [Reason]), "\n"].
+
+path_text(Path) when is_list(Path) ->
+    Path;
+path_text(Path) ->
+    io_lib:format("~p", [Path]).
+
+option_name(Option) -> Option.

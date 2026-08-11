@@ -11,7 +11,8 @@ provider_registration_test() ->
     ?assert(contains_term(Providers, bgate)),
     ?assert(contains_term(Providers, rebar3_reltree_prv_bgate)),
     ?assert(contains_term(Providers, checkvsn)),
-    ?assert(contains_term(Providers, rebar3_reltree_prv_checkvsn)).
+    ?assert(contains_term(Providers, rebar3_reltree_prv_checkvsn)),
+    ?assertNot(contains_term(Providers, skill)).
 
 provider_metadata_test() ->
     Spec = rebar3_reltree_prv_tree:option_spec(),
@@ -110,6 +111,15 @@ provider_help_is_successful_test() ->
     State0 = rebar_state:new([]),
     State1 = rebar_state:command_args(State0, ["--help"]),
     ?assertMatch({ok, _}, rebar3_reltree_prv_tree:do(State1)).
+
+provider_help_is_local_to_adapters_test() ->
+    TreeHelp = lists:flatten(rebar3_reltree_prv_tree:help()),
+    BgateHelp = lists:flatten(rebar3_reltree_prv_bgate:help()),
+    ?assert(string:str(TreeHelp, "--scan-roots") > 0),
+    ?assert(string:str(BgateHelp, "--check") > 0),
+    TopHelp = lists:flatten(rebar3_reltree_cli:help(top)),
+    ?assertEqual(0, string:str(TopHelp, "tree   inspect")),
+    ?assertEqual(0, string:str(TopHelp, "bgate  ")).
 
 provider_dispatches_valid_project_and_writes_report_test() ->
     Root = rebar3_reltree_fixtures:new_root(),
