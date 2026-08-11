@@ -5,14 +5,16 @@
 - Name: `migrate-reltree-gates`
 - Project: `/home/slepher/project/rebar3_reltree`
 - Goal: migrate the sibling skill installer behavior and local badge gate into `rebar3_reltree`
-- Updated: 2026-08-10 Asia/Shanghai
+- Updated: 2026-08-11 Asia/Shanghai
 
 ## Current phase
 
-- Phase: `planning`
-- Current task: `task-4`
-- Implementation stage: `none`
-- Next action: dispatch task-4 coding worker for local bgate --check|--write, then run independent verification.
+- Phase: `rework`
+- Active plan: `plan-1.md`
+- Draft plan: `none`
+- Current task: `task-5`
+- Implementation stage: `task-5 review 1 changes_required; correction limited to version assertions`
+- Next action: commit the review artifact and ledger/status checkpoint, then dispatch Luna for the exact review-1 correction.
 
 ## Repository snapshot
 
@@ -99,6 +101,21 @@
 - Sol wrote `task-4.md` with the user-narrowed local `bgate --check|--write` scope,
   including no-CI warning behavior, master fallback, badge preservation, README.zh parity,
   error paths, provider/escript parity, and the commit subject `feat: add reltree badge gate`.
+- task-5 coding self-tests passed: compile 0; version EUnit 7/0; checkvsn EUnit 6/0; provider EUnit 12/0;
+  full EUnit 126/0; CT 5/0; escriptize 0; escript keeps `checkvsn` unknown and tree/bgate help working;
+  fixture success/gap/tag-mismatch/no-HEAD/unknown-arg and no-write/ref-snapshot checks passed; diff check 0.
+- task-5 worker changed only the task-owned source/test paths; initiative documents and the user's
+  `.codex/skills/local-workflow/SKILL.md` remain unstaged.
+- Dispatcher committed task-5 as `85a1b8e` with subject `feat: add local reltree version gate`; staged
+  name set matched the eight task-owned source/test paths and `git diff --cached --check` exited 0.
+- Independent task-5 verification passed on `85a1b8ee91476ff3bb9f3fb9c637decb78f94d7e`: compile 0;
+  version/checkvsn/provider EUnit 7/0, 6/0, 12/0; full EUnit 126/0; CT 5/0; escriptize 0;
+  escript checkvsn unknown exit 2 and tree/bgate help exit 0; committed diff check 0; no task-5
+  product changes remained in the worktree.
+- Sol review 1 for commit `85a1b8e` returned `changes_required`: add direct version-policy assertions for
+  app below highest, minor/major jumps, non-zero next-minor patch, and non-zero next-major minor/patch;
+  no product logic finding or scope violation was reported. Review artifact:
+  `task-5-code-review-1.md`.
 
 ## Blocker
 
