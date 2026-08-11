@@ -91,6 +91,19 @@ checkvsn_rejects_gaps_and_current_tag_mismatch_test() ->
                  rebar3_reltree_version:check(
                    "1.2", #{reachable_tags => [], head_tags => []})).
 
+checkvsn_rejects_independent_version_discontinuities_test() ->
+    Facts = #{reachable_tags => ["1.2.0"], head_tags => []},
+    ?assertMatch({error, {version_not_continuous, _}},
+                 rebar3_reltree_version:check("1.1.9", Facts)),
+    ?assertMatch({error, {version_not_continuous, _}},
+                 rebar3_reltree_version:check("1.4.0", Facts)),
+    ?assertMatch({error, {version_not_continuous, _}},
+                 rebar3_reltree_version:check("1.3.1", Facts)),
+    ?assertMatch({error, {version_not_continuous, _}},
+                 rebar3_reltree_version:check("3.0.0", Facts)),
+    ?assertMatch({error, {version_not_continuous, _}},
+                 rebar3_reltree_version:check("2.1.0", Facts)).
+
 continuity(App, Tags) ->
     {ok, Facts} = rebar3_reltree_version:check(
                     App, #{reachable_tags => Tags, head_tags => []}),
