@@ -11,3 +11,5 @@
 
 - Initial implementation: `b272304` `Converge reltree installer and packaging`
 - Review 1: `changes_required`; see `task-10-code-review-1.md`
+- Review 1 correction: `49f5632` `fix: task-10 review 1 correction`
+- Final verdict: passed at review 2

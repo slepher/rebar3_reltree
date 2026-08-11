@@ -46,7 +46,7 @@ Do not read any other `task-*.md`, `plan-1.md`, or legacy `plan.md`.
 - Reuse existing argument parsing, filesystem helpers, packaged-resource lookup, and test fixture conventions where they satisfy these invariants.
 - Reuse standard Erlang/OTP file and directory primitives; do not add dependencies.
 - Reuse one authoritative destination resolver (preferably in the installer) rather than retaining separate CLI and installer precedence implementations.
-- Reuse the current same-parent stage/backup/rename/rollback skeleton only after each branch satisfies this contract. A minimal deterministic file-failure seam may remain test-only; it is not a public transaction API.
+- Reuse the current same-parent stage/backup/rename/rollback skeleton only after each branch satisfies this contract. Any deterministic file-failure seam must be private/test-only and limited to representative rollback-boundary tests; it is not a public transaction API. Production exports remain minimal: the installer entry and destination resolver only, with no exported fault map/function or unused formatter surface.
 - Reject network fetches, remote archives, generated downloads, or shell-based installers.
 - Reject installing parent bundles, unrelated skills, or more than the two leaf artifacts.
 - Reject in-place force overwrites that can expose mixed old/new content.
@@ -72,7 +72,7 @@ Do not read any other `task-*.md`, `plan-1.md`, or legacy `plan.md`.
 - Explicit `--dest` always wins; otherwise `CODEX_HOME` wins over home fallback.
 - Exactly two leaf files are installed; no directory-wide copying.
 - Source, stage, and successful target have the exact entry set `SKILL.md`, `agents/`, and `agents/openai.yaml`; installed bytes equal packaged bytes.
-- Both source and stage leaves are regular files, never symlinks, and reject a provable multi-link/hardlink identity. Required directories are actual directories with exact case-sensitive names.
+- Both source and stage leaves are regular files, never symlinks. Required directories are actual directories with exact case-sensitive names. Hardlink-count rejection is not a product requirement for this task.
 - Existing destination conflicts fail by default before destination mutation.
 - `--force` publishes only after the complete replacement has been staged and validated.
 - Any failure leaves either the previous complete install or no install, never a mixed tree.
@@ -84,7 +84,7 @@ Do not read any other `task-*.md`, `plan-1.md`, or legacy `plan.md`.
 
 ## Error/write boundaries
 
-- Validate arguments, destination value, exact source shape, regular/link identity, path overlap, and existing parent type before creating package-derived files.
+- Validate arguments, destination value, exact source shape, regular-file/symlink safety, path confinement/overlap, and existing parent type before creating package-derived files.
 - Writes are limited to missing directories on the resolved parent path, a unique stage/backup sibling under that parent, and the resolved `reltree` target. Existing parent contents are never removed.
 - On non-force conflict, do not create, truncate, rename, or remove destination content.
 - On force, preserve the prior destination until the staged replacement is complete; publish via bounded rename/swap steps.
@@ -107,7 +107,7 @@ main(args):
 
 install(source, parent, force):
   target = parent + "/reltree"
-  validate exact source directories and two regular, single-link leaves; read bytes
+  validate exact source directories and two regular non-symlink leaves; read bytes
   canonicalize/lstat source, parent, target; reject unsafe links and overlap before writes
   ensure missing parent directories without following unsafe links
 
@@ -145,8 +145,8 @@ install(source, parent, force):
 
 - Existing destination without `--force` returns a conflict and leaves all prior bytes unchanged.
 - Missing/unreadable packaged leaf fails before destination publication.
-- Missing, extra, malformed, unreadable, symlink, or hardlinked packaged leaves fail before destination publication.
-- Inject stage create, agents create, each leaf open/write/close, stage validation, first rename, backup rename, replace rename, rollback, stage cleanup, and backup cleanup failures. Each assertion proves an absent/full-old/full-new target, never mixed bytes; residual recoverable artifacts are exact and reported when cleanup itself fails.
+- Missing, extra, malformed, unreadable, or symlink packaged leaves fail before destination publication. Hardlink-count rejection is neither required nor accepted as a task-10 feature.
+- Through one private/test-only deterministic seam, cover a small representative failure set: one failure while staging before publication, one replacement-publication failure after preserving the old target that exercises successful rollback, and, only if needed to prove the observable recovery boundary, one rollback or cleanup failure. Each assertion proves an absent/full-old/full-new target, never mixed bytes; any retained recoverable artifact is exact and reported. Do not enumerate every open/write/close/rename/cleanup point or expose a production fault/transaction API.
 - Existing directory/file/symlink targets without force return conflict and leave prior bytes/identity unchanged.
 - Unknown/duplicate/missing-value options or positional commands return usage error with reason and no package lookup or installer writes.
 
@@ -155,8 +155,8 @@ install(source, parent, force):
 - Assert exactly two leaves are copied; unrelated packaged files are absent.
 - Assert local packaged sources are used and no network/shell path is invoked.
 - Assert escript `tree`, `checkvsn`, and `bgate` are rejected/unavailable.
-- Assert `skill --install` is rejected and help exposes only the direct installer surface.
-- Reject source/agents/leaf symlinks, provable hardlinks, non-directory components, direct/`..`/symlink-resolved source-parent-target overlap, unsafe stage/backup escape, and name-allocation exhaustion. External symlink referent bytes/entries remain unchanged.
+- Assert `skill --install` is rejected, its rejection output does not advertise that legacy command, and help exposes only the direct installer surface. Rejections for `tree`, `checkvsn`, and `bgate` likewise must not advertise any project-command escript surface.
+- Reject source/agents/leaf symlinks, non-directory components, direct/`..`/symlink-resolved source-parent-target overlap, and unsafe stage/backup escape. External symlink referent bytes/entries remain unchanged. Do not add hardlink-count policy or a generic path/transaction framework.
 - Assert plugin entry implementation is unchanged; existing provider tests are read-only evidence, not task-owned tests.
 
 ## Coding Self-Tests
@@ -190,7 +190,7 @@ Because force replacement and link/path handling are high-risk boundaries, the d
 - Stop if destination semantics conflict with an accepted public contract not editable in owned paths.
 - Stop if safe replace/rollback cannot be tested deterministically with existing test seams without cross-area redesign.
 - Stop on any requirement to add network access, dependencies, or task-11 cleanup.
-- Stop if a partial hunk cannot be distinguished from unrelated user work, if regular/hardlink or canonical-overlap safety cannot be proved with current OTP/filesystem capabilities, or if a secure fix requires a generic transaction/package layer or cross-device semantics.
+- Stop if a partial hunk cannot be distinguished from unrelated user work, if normative regular-file/symlink or canonical-overlap safety cannot be proved with current OTP/filesystem capabilities, or if a secure fix requires a generic transaction/package layer or cross-device semantics.
 - Stop if rollback/cleanup artifact semantics or symlink handling reveal consequential ambiguity that changes visible behavior.
 - Stop when extra historical abstractions/options/resources cannot be proved or removed within normative installer/CLI/package behavior; report them for task-11 instead of expanding into general cleanup. Task-14 release guidance is also excluded.
 
@@ -199,7 +199,7 @@ On stop, return `Clarification required` with exact path/symbol, evidence, requi
 ## Completion criteria
 
 - Success, failure, and security/scope groups each directly prove their named acceptance boundary.
-- Built escript evidence proves zero-argument first install, optional destination/force, exact two-leaf archive/install, default conflict, complete force replacement, no mixed target on failure, path/link/overlap confinement, and local-only responsibility.
+- Built escript evidence proves zero-argument first install, optional destination/force, exact two-leaf archive/install, default conflict, complete force replacement, no mixed target across the representative failure/rollback boundary, path/link/overlap confinement, and local-only responsibility.
 - The diff contains only exact owned paths; every bounded-May-change path has direct necessity evidence.
 - No task-11 cleanup or task-14 release guidance is absorbed.
 

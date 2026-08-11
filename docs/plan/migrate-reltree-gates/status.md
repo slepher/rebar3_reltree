@@ -9,12 +9,12 @@
 
 ## Current phase
 
-- Phase: `rework`
+- Phase: `task_planning`
 - Active plan: `plan-2.md`
 - Draft plan: `none`
-- Current task: `task-10`
-- Implementation stage: task-10 review 1 recorded `changes_required`
-- Next action: revise task-10 acceptance text with Sol, then dispatch Luna for the five bounded review corrections and self-tests.
+- Current task: `task-11`
+- Implementation stage: task-10 passed review 2; continuing to the accepted cleanup task
+- Next action: dispatch fresh Sol to write the exact task-11 overdesign-cleanup contract.
 
 ## Repository snapshot
 
