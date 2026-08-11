@@ -180,6 +180,33 @@ write_preserves_last_bare_cr_byte_test() ->
         rebar3_reltree_fixtures:cleanup(Root)
     end.
 
+write_preserves_managed_last_bare_cr_byte_test() ->
+    Root = fixture("https://github.com/acme/managed-bare-cr.git"),
+    try
+        README = filename:join(Root, "README.md"),
+        Master = master("acme/managed-bare-cr"),
+        Original = list_to_binary(Master ++ [13]),
+        ok = file:write_file(README, Original),
+        {ok, #{status := written}} = run(Root, write, #{}),
+        ?assertEqual(Original, read(README))
+    after
+        rebar3_reltree_fixtures:cleanup(Root)
+    end.
+
+check_reports_missing_release_badge_test() ->
+    Root = fixture("https://github.com/acme/missing-release.git"),
+    try
+        rebar3_reltree_fixtures:git_tag(Root, "1.0.0"),
+        README = filename:join(Root, "README.md"),
+        ok = file:write_file(README,
+                             list_to_binary(master("acme/missing-release") ++
+                                             "\n")),
+        ?assertMatch({error, {badge_mismatch, [{_, [missing]}]}},
+                     run(Root, check, #{}))
+    after
+        rebar3_reltree_fixtures:cleanup(Root)
+    end.
+
 chinese_managed_block_must_match_but_prose_may_differ_test() ->
     Root = fixture("https://github.com/acme/zh.git"),
     try

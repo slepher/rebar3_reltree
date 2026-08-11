@@ -386,11 +386,13 @@ check_file(#{content := Content}, Expected) ->
 count_categories(Candidates, ExpectedKinds) ->
     Kinds = [Kind || {_Index, Kind, _Tag, _Text} <- Candidates],
     case {lists:member(master, Kinds), lists:member(release, Kinds),
+          lists:member(release, ExpectedKinds),
           length(Candidates) > length(ExpectedKinds)} of
-        {false, _, _} -> [missing];
-        {true, true, true} -> [duplicate];
-        {true, true, false} -> [wrong_order];
-        {true, false, _} -> [unexpected_release];
+        {false, _, _, _} -> [missing];
+        {true, false, true, _} -> [missing];
+        {true, true, false, _} -> [unexpected_release];
+        {true, true, true, true} -> [duplicate];
+        {true, false, false, true} -> [duplicate];
         _ -> [duplicate]
     end.
 
@@ -594,11 +596,14 @@ line_part(Part, false) ->
 
 line_body({Body, _Eol}) -> Body.
 
-line_eol({_Body, Eol}, Default) ->
-    case Eol of
-        <<>> -> Default;
-        _ -> Eol
-    end.
+line_eol({Body, <<>>}, Default) ->
+    case byte_size(Body) > 0 andalso
+         binary:at(Body, byte_size(Body) - 1) =:= 13 of
+        true -> <<"\r">>;
+        false -> Default
+    end;
+line_eol({_Body, Eol}, _Default) ->
+    Eol.
 
 default_eol(Lines) ->
     case [Eol || {_Body, Eol} <- Lines, Eol =/= <<>>] of
