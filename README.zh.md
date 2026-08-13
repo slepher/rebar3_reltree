@@ -22,7 +22,7 @@
 
 ```erlang
 {project_plugins, [
-    {rebar3_reltree, {git, "https://github.com/slepher/rebar3_reltree.git", {branch, "master"}}}
+    {rebar3_reltree, {git, "https://github.com/slepher/rebar3_reltree.git", {tag, "0.1.0"}}}
 ]}.
 ```
 
@@ -33,6 +33,11 @@ _checkouts/rebar3_reltree -> /path/to/rebar3_reltree
 ```
 
 插件与 Codex skill 相互独立：使用插件命令不要求先安装 skill。
+
+## 0.1.0 版本
+
+这是首个正式版本，无需迁移；除 Erlang/OTP 的 `kernel` 和 `stdlib` 应用外，
+没有固定的运行时依赖。
 
 ## 项目树报告
 

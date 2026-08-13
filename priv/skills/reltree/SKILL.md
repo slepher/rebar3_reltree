@@ -61,12 +61,13 @@ version. Formal tags may use `X.Y.Z` or `vX.Y.Z`; `rc.N` and `ci.N` prereleases 
 
 `checkvsn` validates only local tags, `app.src`, and version continuity. It does not validate
 badges or perform network/release work. Confirmation of the formal release authorizes creation of
-its target local annotated tag; do not ask again for that step. Before moving or deleting a local
-tag, pushing any tag or branch, or publishing an artifact, obtain the user's explicit authorization.
-Remote tags are not overwritten by default, and a public release/artifact is never replaced by
-moving its same-name tag. Do not push or publish by default. When push is authorized, push the tag
-before the `master` branch containing the same release commit, or push both in the same explicit
-Git operation. Do not push a badge release commit before its corresponding tag exists.
+its target local annotated tag; do not ask again for that step.
+
+In this skill, "release" and "publish" mean only the local release commit, local annotated tag,
+and local verification. They never authorize or imply pushing a branch or tag, creating a remote
+release, or publishing an artifact. Treat every remote action as a separate workflow outside the
+release process, and perform one only when the user separately and explicitly requests that exact
+remote action. Never move or overwrite an existing remote tag or public artifact by default.
 
 ## Multi-project release
 
@@ -82,8 +83,9 @@ Prepare locally upstream-to-downstream: create the upstream tag before preparing
 downstream, and each layer may reference only an already prepared upstream tag. The user chooses
 each project's compatibility and target version independently, including after an upstream
 breaking change. Remote tag, push, and publication actions require separate user authorization
-and follow the same upstream-to-downstream order. Never treat examples, directory layouts, or
-historical project lists as repository facts.
+and are outside the release process. Never treat a request to release or publish the projects as
+authorization for those remote actions. Never treat examples, directory layouts, or historical
+project lists as repository facts.
 
 ## After-release checks
 

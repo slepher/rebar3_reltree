@@ -22,7 +22,7 @@ Add the plugin to the target project's `rebar.config`:
 
 ```erlang
 {project_plugins, [
-    {rebar3_reltree, {git, "https://github.com/slepher/rebar3_reltree.git", {branch, "master"}}}
+    {rebar3_reltree, {git, "https://github.com/slepher/rebar3_reltree.git", {tag, "0.1.0"}}}
 ]}.
 ```
 
@@ -33,6 +33,11 @@ _checkouts/rebar3_reltree -> /path/to/rebar3_reltree
 ```
 
 The plugin and the Codex skill are independent: plugin commands do not require the skill to be installed.
+
+## Release 0.1.0
+
+This is the initial release. It has no migration requirements and no fixed runtime dependencies
+beyond the Erlang/OTP `kernel` and `stdlib` applications.
 
 ## Project tree report
 
