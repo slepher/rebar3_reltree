@@ -188,7 +188,7 @@ fixture(Name) ->
     Root = filename:join("/tmp", "reltree-task10-installer-" ++ Name ++ "-" ++
                          integer_to_list(erlang:unique_integer([positive]))),
     Source = filename:join(Root, "source"),
-    Parent = filename:join(Root, "parent with space/中文"),
+    Parent = filename:join(Root, "parent with space/" ++ unicode_dir()),
     ok = filelib:ensure_dir(filename:join(Source, "placeholder")),
     ok = file:make_dir(filename:join(Source, "agents")),
     ok = file:write_file(filename:join(Source, "SKILL.md"),
@@ -197,6 +197,13 @@ fixture(Name) ->
                          <<"agent bytes\n">>),
     ok = filelib:ensure_dir(filename:join(Parent, "placeholder")),
     {Source, Parent, Root}.
+
+unicode_dir() ->
+    Codepoints = [16#4E2D, 16#6587],
+    case file:native_name_encoding() of
+        utf8 -> Codepoints;
+        latin1 -> binary_to_list(unicode:characters_to_binary(Codepoints))
+    end.
 
 make_target(Target, Skill, Agent, Extra) ->
     ok = filelib:ensure_dir(filename:join(Target, "agents/placeholder")),

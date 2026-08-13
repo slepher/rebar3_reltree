@@ -319,7 +319,7 @@ release_badge(Repo, Tag) ->
                 [$v | Rest] -> Rest;
                 _ -> Tag
             end,
-    "[![" ++ Label ++ " release CI](" ++ Base ++
+    "**" ++ Label ++ "** [![release CI](" ++ Base ++
     "/badge.svg?branch=" ++ Tag ++ "&event=push)](" ++ Base ++
     "?query=branch%3A" ++ Tag ++ ")".
 
@@ -591,28 +591,32 @@ candidates([{Body, _Eol} | Rest], Index, Acc) ->
 candidate(Text) ->
     case lists:prefix("[![master CI]", Text) of
         true -> {master, none};
-        false ->
-            case lists:prefix("[![", Text) of
-                false -> none;
-                true ->
-                    Rest = lists:nthtail(3, Text),
-                    case string:split(Rest, "]", leading) of
-                        [Label, _Rest] ->
-                            case lists:suffix(" release CI", Label) of
-                                true ->
-                                    Version = lists:sublist(
-                                                Label,
-                                                length(Label) - 11),
-                                    case Version of
-                                        [] -> none;
-                                        _ -> {release, Version}
-                                    end;
-                                false -> none
-                            end;
-                        _ -> none
-                    end
-            end
+        false -> release_candidate(Text)
     end.
+
+release_candidate("**" ++ Rest) ->
+    case string:split(Rest, "** [![release CI](", leading) of
+        [Version, Image] when Version =/= [], Image =/= [] ->
+            {release, Version};
+        _ ->
+            none
+    end;
+release_candidate("[![" ++ Rest) ->
+    case string:split(Rest, "]", leading) of
+        [Label, _Rest] ->
+            case lists:suffix(" release CI", Label) of
+                true ->
+                    Version = lists:sublist(Label, length(Label) - 11),
+                    case Version of
+                        [] -> none;
+                        _ -> {release, Version}
+                    end;
+                false -> none
+            end;
+        _ -> none
+    end;
+release_candidate(_Text) ->
+    none.
 
 split_lines(Content) ->
     [line_part(Part, IsLast) ||

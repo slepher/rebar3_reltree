@@ -300,7 +300,6 @@ local_bare_git_lookup_selectors_test() ->
                                              "reltree@example.invalid"]),
         {ok, _} = git_fixture_command(Work, ["config", "user.name",
                                              "reltree fixture"]),
-        {ok, _} = git_fixture_command(Work, ["branch", "-M", "main"]),
         ok = file:write_file(filename:join(Work, "README"), <<"fixture\n">>),
         {ok, _} = git_fixture_command(Work, ["add", "README"]),
         {ok, _} = git_fixture_command(Work, ["commit", "-qm", "fixture"]),
@@ -316,7 +315,7 @@ local_bare_git_lookup_selectors_test() ->
         {ok, Head} = rebar3_reltree_git:lookup(
                        Url, #{kind => head, value => "HEAD"}, #{}),
         {ok, Head} = rebar3_reltree_git:lookup(
-                       Url, #{kind => branch, value => "main"}, #{}),
+                       Url, #{kind => branch, value => "master"}, #{}),
         {ok, Head} = rebar3_reltree_git:lookup(
                        Url, #{kind => tag, value => "light"}, #{}),
         {ok, Annotated0} = git_fixture_command(
@@ -325,13 +324,13 @@ local_bare_git_lookup_selectors_test() ->
         {ok, Annotated} = rebar3_reltree_git:lookup(
                             Url, #{kind => tag, value => "annotated"}, #{}),
         {ok, Head} = rebar3_reltree_git:lookup(
-                       Url, #{kind => ref, value => "refs/heads/main"}, #{}),
+                       Url, #{kind => ref, value => "refs/heads/master"}, #{}),
         ?assertMatch({error, no_matching_revision},
                      rebar3_reltree_git:lookup(
                        Url, #{kind => branch, value => "missing"}, #{})),
         {ok, Rows} = rebar3_reltree_git:command(
                        "/", ["ls-remote", "--", Url], #{}),
-        ?assert(binary:match(Rows, <<"refs/heads/main">>) =/= nomatch),
+        ?assert(binary:match(Rows, <<"refs/heads/master">>) =/= nomatch),
         ?assert(binary:match(Rows, <<"refs/tags/annotated^{}">>) =/= nomatch),
         ?assertMatch({error, {exit, 1, _}},
                      rebar3_reltree_git:command(

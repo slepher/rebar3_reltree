@@ -227,7 +227,7 @@ release_badge(Repo, Tag) ->
                 [$v | Rest] -> Rest;
                 _ -> Tag
             end,
-    "[![" ++ Label ++ " release CI](" ++ Base ++
+    "**" ++ Label ++ "** [![release CI](" ++ Base ++
     "/badge.svg?branch=" ++ Tag ++ "&event=push)](" ++ Base ++
     "?query=branch%3A" ++ Tag ++ ")".
 
@@ -236,7 +236,9 @@ badge_file_state(#{content := Content}, Expected) ->
     Release = maps:get(release, Expected),
     MasterCount = count_substring(binary_to_list(Content), "[![master CI]("),
     ExpectedMaster = count_substring(binary_to_list(Content), Master),
-    ReleaseCount = count_substring(binary_to_list(Content), " release CI]("),
+    ReleaseCount = count_substring(binary_to_list(Content),
+                                   "** [![release CI](") +
+                   count_substring(binary_to_list(Content), " release CI]("),
     ExpectedRelease = case Release of
                           none -> 0;
                           Value -> count_substring(binary_to_list(Content),

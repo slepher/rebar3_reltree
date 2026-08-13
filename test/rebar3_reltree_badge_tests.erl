@@ -168,7 +168,7 @@ write_with_tag_replaces_managed_lines_is_idempotent_and_preserves_crlf_test() ->
         Chinese = filename:join(Root, "README.zh.md"),
         Master = master("acme/preserve"),
         Old = master("old/repo"),
-        OldRelease = release("old/repo", "1.0.0"),
+        OldRelease = legacy_release("old/repo", "1.0.0"),
         Body = iolist_to_binary(["intro\r\n", Old, "\r\n\r\n", OldRelease,
                                  "\r\n\r\n", "[![Other](other)](other)\r\n",
                                  unicode:characters_to_binary("正文\r\n")]),
@@ -443,7 +443,12 @@ release(Repo, Tag) ->
                   [$v | Rest] -> Rest;
                   _ -> Tag
               end,
-    "[![" ++ Display ++ " release CI](https://github.com/" ++ Repo ++
+    "**" ++ Display ++ "** [![release CI](https://github.com/" ++ Repo ++
+    "/actions/workflows/ci.yml/badge.svg?branch=" ++ Tag ++ "&event=push)](https://github.com/" ++
+    Repo ++ "/actions/workflows/ci.yml?query=branch%3A" ++ Tag ++ ")".
+
+legacy_release(Repo, Tag) ->
+    "[![" ++ Tag ++ " release CI](https://github.com/" ++ Repo ++
     "/actions/workflows/ci.yml/badge.svg?branch=" ++ Tag ++ "&event=push)](https://github.com/" ++
     Repo ++ "/actions/workflows/ci.yml?query=branch%3A" ++ Tag ++ ")".
 

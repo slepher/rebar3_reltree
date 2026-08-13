@@ -204,8 +204,8 @@ declaration_less(A, B) ->
 
 terms_section(Name, Terms) ->
     Sorted = lists:sort(fun(A, B) -> term_text(A) =< term_text(B) end, Terms),
-    ["- ", Name, ":\n", none_or(["  - ", term_value(Term), "\n" ||
-                                      Term <- Sorted], "  - none\n"), "\n"].
+    Lines = [["  - ", term_value(Term), "\n"] || Term <- Sorted],
+    ["- ", Name, ":\n", none_or(Lines, "  - none\n"), "\n"].
 
 relation_section(Name, Edges, Direction) ->
     ["- ", Name, ":\n",

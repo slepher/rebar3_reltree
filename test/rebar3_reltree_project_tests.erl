@@ -114,7 +114,7 @@ ci_badges_are_read_only_facts_and_mismatch_changes_status_test() ->
                  "workflows/ci.yml/badge.svg?branch=master&event=push)]("
                  "https://github.com/owner/repo/actions/workflows/ci.yml?"
                  "query=branch%3Amaster)",
-        Release = "[![1.2.0 release CI](https://github.com/owner/repo/"
+        Release = "**1.2.0** [![release CI](https://github.com/owner/repo/"
                   "actions/workflows/ci.yml/badge.svg?branch=v1.2.0&"
                   "event=push)](https://github.com/owner/repo/actions/"
                   "workflows/ci.yml?query=branch%3Av1.2.0)",

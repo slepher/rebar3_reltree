@@ -40,7 +40,8 @@ explicit_destination_installs_exact_two_files_test() ->
     with_root(
       "explicit",
       fun(Root) ->
-              Dest = filename:join(Root, "destination with space/中文"),
+              Dest = filename:join(Root,
+                                   "destination with space/" ++ unicode_dir()),
               {Exit, Output} = run_script(["--dest", Dest], Root),
               Target = filename:join(filename:absname(Dest), "reltree"),
               ?assertEqual(0, Exit),
@@ -125,9 +126,15 @@ assert_exact_install(Target) ->
     ok.
 
 assert_install_output(Output, Target) ->
-    ?assertEqual(unicode:characters_to_binary(
+    ?assertEqual(native_path_binary(
                    "reltree skill installed at " ++ Target ++ "\n"),
                  Output).
+
+native_path_binary(Path) ->
+    case file:native_name_encoding() of
+        utf8 -> unicode:characters_to_binary(Path);
+        latin1 -> list_to_binary(Path)
+    end.
 
 snapshot(Target) ->
     {read(filename:join(Target, "SKILL.md")),
@@ -170,6 +177,13 @@ with_root(Name, Fun) ->
     try Fun(Root)
     after
         remove_path(Root)
+    end.
+
+unicode_dir() ->
+    Codepoints = [16#4E2D, 16#6587],
+    case file:native_name_encoding() of
+        utf8 -> Codepoints;
+        latin1 -> binary_to_list(unicode:characters_to_binary(Codepoints))
     end.
 
 entries(Path) ->

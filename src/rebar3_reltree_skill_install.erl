@@ -560,7 +560,8 @@ loader_list_dir(Path) ->
     end.
 
 loader_read_file(Path) ->
-    case erl_prim_loader:read_file(Path) of
+    case erl_prim_loader:get_file(Path) of
+        {ok, Bytes, _FullName} -> {ok, Bytes};
         error -> {error, enoent};
         Result -> Result
     end.
