@@ -24,7 +24,7 @@ SKILL.md
 agents/openai.yaml
 ```
 
-There is no packaged `release.md` copy, README, template, script, or other policy resource. The
+There is no packaged README, template, script, or other policy resource. The
 installer escript only installs this packaged skill and performs local file operations: no network,
 Git, tag, push, or artifact publication. Its entry point has no provider-command subcommands.
 The Rebar3 plugin independently provides `rebar3 reltree tree`, `rebar3 reltree checkvsn`, and
@@ -33,9 +33,7 @@ that this skill already be installed.
 
 ## Source of truth
 
-At the start of release work, read the target repository's current `release.md` and apply §§1–12.
-This skill keeps only the executable decisions and checks below; it does not reproduce that
-specification. `src/*.app.src` `vsn` is the only application-version fact, and the user decides
+`src/*.app.src` `vsn` is the only application-version fact, and the user decides
 whether to release. If that version has no equivalent formal tag, use it unchanged as the target
 version. If it is already formally tagged, the user chooses the strict next patch, the strict next
 minor with `.0`, or a new generation; never jump versions. Use a prerelease only when the user
@@ -48,11 +46,18 @@ asks, with the `app.src` base and a locally incremented same-kind suffix.
    no equivalent formal tag; only when it is already formally tagged, ask whether the next release
    is a patch, minor, or new generation. Update `app.src` and requested fixed runtime dependencies.
 3. Update `README.md` and an existing `README.zh.md` together, including their version,
-   installation examples, changed fixed dependencies, migration guidance, and CI badges. When
-   needed, run `rebar3 reltree bgate --write`; without `ci.yml`, do not invent a badge.
+   installation examples, changed fixed dependencies, migration guidance, and CI badges. To write
+   the release CI badge before tagging, run `rebar3 reltree bgate --write --tag` (the badge tag
+   is the `app.src` version); plain `--write` maintains only the master badge. Without `ci.yml`,
+   do not invent a badge.
 4. Create the release commit and a local annotated tag. Run `rebar3 reltree checkvsn`,
    `rebar3 reltree bgate --check`, and the project's complete tests. Verify the tag, version,
    dependency, README, and artifact results agree.
+
+Version numbers are `X.Y.Z`: patch is the strict next compatible version, minor with `.0` is the
+strict next breaking version, and a new generation increments `X` with `.0.0`. Never skip a
+version. Formal tags may use `X.Y.Z` or `vX.Y.Z`; `rc.N` and `ci.N` prereleases keep the
+`app.src` base, and `check-*` tags are ignored.
 
 `checkvsn` validates only local tags, `app.src`, and version continuity. It does not validate
 badges or perform network/release work. Confirmation of the formal release authorizes creation of
@@ -77,8 +82,8 @@ Prepare locally upstream-to-downstream: create the upstream tag before preparing
 downstream, and each layer may reference only an already prepared upstream tag. The user chooses
 each project's compatibility and target version independently, including after an upstream
 breaking change. Remote tag, push, and publication actions require separate user authorization
-and follow the same upstream-to-downstream order. The `release.md` §12 topology is illustrative,
-not repository fact.
+and follow the same upstream-to-downstream order. Never treat examples, directory layouts, or
+historical project lists as repository facts.
 
 ## After-release checks
 

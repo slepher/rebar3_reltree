@@ -1,4 +1,4 @@
 interface:
   display_name: "Reltree"
   short_description: "Guide local reltree releases"
-  default_prompt: "Read the target repository's current release.md and follow the packaged reltree release guidance."
+  default_prompt: "Use current local repository facts and the packaged reltree guidance to prepare a release."
