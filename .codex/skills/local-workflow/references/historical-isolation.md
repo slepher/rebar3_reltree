@@ -20,8 +20,8 @@ written or recovery must distinguish current authority from historical work.
    surfaces or requirements that could otherwise be mistaken for current scope.
 
 Sol must not open, read, search, or receive a superseded plan, including legacy
-`plan.md`, while planning, revising a plan, defining a task, selecting
-continuity, or reviewing code. List each such path as a forbidden read in every
+`plan.md`, while planning, revising a plan, defining a task, or reviewing code.
+List each such path as a forbidden read in every
 Sol contract. Do not send superseded plans or sibling defect lists to a coding
 worker.
 

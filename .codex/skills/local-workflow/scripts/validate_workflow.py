@@ -18,7 +18,6 @@ PHASES = {
     "rework",
     "optional_verification",
     "committing",
-    "handoff",
     "blocked",
     "complete",
 }
@@ -30,18 +29,19 @@ TASK_REQUIRED = {
     "rework",
     "optional_verification",
     "committing",
-    "handoff",
 }
-REQUIRED = {
-    "Goal",
-    "Repository",
-    "Phase",
-    "Active plan",
-    "Draft plan",
-    "Current task",
-    "Next action",
-    "Blocker",
+REQUIRED_BY_SECTION = {
+    "Initiative": {"Goal", "Repository"},
+    "Current workflow": {
+        "Phase",
+        "Active plan",
+        "Draft plan",
+        "Current task",
+        "Next action",
+        "Blocker",
+    },
 }
+REQUIRED = set().union(*REQUIRED_BY_SECTION.values())
 PLAN_RE = re.compile(r"plan-[1-9][0-9]*\.md\Z")
 TASK_RE = re.compile(r"task-[1-9][0-9]*(?:\.[1-9][0-9]*)?\.md\Z")
 FIELD_RE = re.compile(r"^- ([^:]+):\s*(.*)$")
@@ -58,13 +58,19 @@ def plain(value: str) -> str:
 def fields_from(status: Path) -> tuple[dict[str, str], list[str]]:
     fields: dict[str, str] = {}
     errors: list[str] = []
+    section = ""
     for number, line in enumerate(
         status.read_text(encoding="utf-8").splitlines(), 1
     ):
+        if line.startswith("## "):
+            section = line[3:].strip()
+            continue
         match = FIELD_RE.match(line)
         if not match:
             continue
         key, value = match.groups()
+        if key not in REQUIRED_BY_SECTION.get(section, set()):
+            continue
         if key in fields:
             errors.append(f"status.md:{number}: duplicate field {key!r}")
         fields[key] = plain(value)
@@ -100,6 +106,13 @@ def validate(initiative: Path) -> list[str]:
     status = initiative / "status.md"
     if not status.is_file():
         return [f"missing {status}"]
+
+    status_text = status.read_text(encoding="utf-8")
+    if "## Current phase" in status_text or "- Project:" in status_text:
+        return [
+            "status.md uses the legacy schema; mechanically migrate its current "
+            "snapshot to assets/status-template.md before continuing"
+        ]
 
     fields, errors = fields_from(status)
     for key in sorted(REQUIRED - fields.keys()):

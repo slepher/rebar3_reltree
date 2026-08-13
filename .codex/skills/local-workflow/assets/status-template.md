@@ -31,17 +31,5 @@
 ## Commit
 
 - Implementation commit: `none`
-- Verification correction commit: `none`
-- Review correction commit: `none`
-- Workflow checkpoint: `none`
-
-## Continuity
-
-- Next task: `none`
-- Next Sol: `none`
-- Reason: `none`
-- Last known child: `none`
-
-## Completed tasks
-
-- None.
+- Latest correction commit: `none`
+- Latest review commit: `none`
