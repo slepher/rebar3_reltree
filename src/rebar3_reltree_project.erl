@@ -216,7 +216,7 @@ expected_badges(Repo, #{tag := Tag}) ->
 master_badge(Repo) ->
     Base = "https://github.com/" ++ Repo ++
            "/actions/workflows/ci.yml",
-    "[![master CI](" ++ Base ++
+    "**master CI** [![CI](" ++ Base ++
     "/badge.svg?branch=master&event=push)](" ++ Base ++
     "?query=branch%3Amaster)".
 
@@ -227,26 +227,21 @@ release_badge(Repo, Tag) ->
                 [$v | Rest] -> Rest;
                 _ -> Tag
             end,
-    "**" ++ Label ++ "** [![release CI](" ++ Base ++
+    "**" ++ Label ++ " release CI** [![CI](" ++ Base ++
     "/badge.svg?branch=" ++ Tag ++ "&event=push)](" ++ Base ++
     "?query=branch%3A" ++ Tag ++ ")".
 
 badge_file_state(#{content := Content}, Expected) ->
     Master = maps:get(master, Expected),
     Release = maps:get(release, Expected),
-    MasterCount = count_substring(binary_to_list(Content), "[![master CI]("),
-    ExpectedMaster = count_substring(binary_to_list(Content), Master),
-    ReleaseCount = count_substring(binary_to_list(Content),
-                                   "** [![release CI](") +
-                   count_substring(binary_to_list(Content), " release CI]("),
-    ExpectedRelease = case Release of
-                          none -> 0;
-                          Value -> count_substring(binary_to_list(Content),
-                                                   Value)
-                      end,
-    case {MasterCount, ExpectedMaster, Release} of
-        {1, 1, none} -> ok;
-        {1, 1, _} when ReleaseCount =:= 1, ExpectedRelease =:= 1 -> ok;
+    MasterCount = count_substring(binary_to_list(Content), Master),
+    ReleaseCount = case Release of
+                       none -> 0;
+                       Value -> count_substring(binary_to_list(Content), Value)
+                   end,
+    case {MasterCount, Release} of
+        {1, none} -> ok;
+        {1, _} when ReleaseCount =:= 1 -> ok;
         _ -> mismatch
     end;
 badge_file_state(#{read_error := _Reason}, _Expected) ->

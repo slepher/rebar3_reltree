@@ -308,7 +308,7 @@ equivalent_tags_list(FormalTags) ->
 master_badge(Repo) ->
     Base = "https://github.com/" ++ Repo ++
            "/actions/workflows/ci.yml",
-    "[![master CI](" ++ Base ++
+    "**master CI** [![CI](" ++ Base ++
     "/badge.svg?branch=master&event=push)](" ++ Base ++
     "?query=branch%3Amaster)".
 
@@ -319,7 +319,7 @@ release_badge(Repo, Tag) ->
                 [$v | Rest] -> Rest;
                 _ -> Tag
             end,
-    "**" ++ Label ++ "** [![release CI](" ++ Base ++
+    "**" ++ Label ++ " release CI** [![CI](" ++ Base ++
     "/badge.svg?branch=" ++ Tag ++ "&event=push)](" ++ Base ++
     "?query=branch%3A" ++ Tag ++ ")".
 
@@ -589,17 +589,26 @@ candidates([{Body, _Eol} | Rest], Index, Acc) ->
     end.
 
 candidate(Text) ->
-    case lists:prefix("[![master CI]", Text) of
+    case lists:prefix("**master CI** [![CI]", Text) of
         true -> {master, none};
-        false -> release_candidate(Text)
+        false ->
+            case lists:prefix("[![master CI]", Text) of
+                true -> {master, none};
+                false -> release_candidate(Text)
+            end
     end.
 
 release_candidate("**" ++ Rest) ->
-    case string:split(Rest, "** [![release CI](", leading) of
+    case string:split(Rest, " release CI** [![CI](", leading) of
         [Version, Image] when Version =/= [], Image =/= [] ->
             {release, Version};
         _ ->
-            none
+            case string:split(Rest, "** [![release CI](", leading) of
+                [Version, Image] when Version =/= [], Image =/= [] ->
+                    {release, Version};
+                _ ->
+                    none
+            end
     end;
 release_candidate("[![" ++ Rest) ->
     case string:split(Rest, "]", leading) of

@@ -224,7 +224,7 @@ write_preserves_last_bare_cr_byte_test() ->
         Original = <<"tail", 13>>,
         ok = file:write_file(README, Original),
         {ok, #{status := written}} = run(Root, write, #{}),
-        Expected = <<"[![master CI](https://github.com/acme/bare-cr/actions/workflows/ci.yml/badge.svg?branch=master&event=push)](https://github.com/acme/bare-cr/actions/workflows/ci.yml?query=branch%3Amaster)\n\n",
+        Expected = <<"**master CI** [![CI](https://github.com/acme/bare-cr/actions/workflows/ci.yml/badge.svg?branch=master&event=push)](https://github.com/acme/bare-cr/actions/workflows/ci.yml?query=branch%3Amaster)\n\n",
                     "tail", 13>>,
         ?assertEqual(Expected, read(README))
     after
@@ -434,7 +434,7 @@ fixture(Origin) ->
 workflow(Root) -> filename:join([Root, ".github", "workflows", "ci.yml"]).
 
 master(Repo) ->
-    "[![master CI](https://github.com/" ++ Repo ++
+    "**master CI** [![CI](https://github.com/" ++ Repo ++
     "/actions/workflows/ci.yml/badge.svg?branch=master&event=push)](https://github.com/" ++
     Repo ++ "/actions/workflows/ci.yml?query=branch%3Amaster)".
 
@@ -443,7 +443,7 @@ release(Repo, Tag) ->
                   [$v | Rest] -> Rest;
                   _ -> Tag
               end,
-    "**" ++ Display ++ "** [![release CI](https://github.com/" ++ Repo ++
+    "**" ++ Display ++ " release CI** [![CI](https://github.com/" ++ Repo ++
     "/actions/workflows/ci.yml/badge.svg?branch=" ++ Tag ++ "&event=push)](https://github.com/" ++
     Repo ++ "/actions/workflows/ci.yml?query=branch%3A" ++ Tag ++ ")".
 

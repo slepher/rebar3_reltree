@@ -173,8 +173,8 @@ bgate_surface(_Config) ->
         ?assertMatch(nomatch, binary:match(Bytes, <<"release CI">>)),
         {ok, WriteTagState} = rebar3_reltree_prv_bgate:do(WriteTagState),
         {ok, TagBytes} = file:read_file(README),
-        ?assertMatch({_, _}, binary:match(TagBytes, <<"**0.1.0**">>)),
-        ?assertMatch({_, _}, binary:match(TagBytes, <<"[![release CI]">>)),
+        ?assertMatch({_, _}, binary:match(TagBytes,
+                                         <<"**0.1.0 release CI** [![CI]">>)),
         rebar3_reltree_fixtures:git_tag(Root, "0.1.0"),
         {ok, CheckState} = rebar3_reltree_prv_bgate:do(CheckState),
         ?assertNot(filelib:is_regular(filename:join(Root, "project.md")))

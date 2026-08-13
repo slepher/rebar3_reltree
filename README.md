@@ -1,6 +1,6 @@
-[![master CI](https://github.com/slepher/rebar3_reltree/actions/workflows/ci.yml/badge.svg?branch=master&event=push)](https://github.com/slepher/rebar3_reltree/actions/workflows/ci.yml?query=branch%3Amaster)
+**master CI** [![CI](https://github.com/slepher/rebar3_reltree/actions/workflows/ci.yml/badge.svg?branch=master&event=push)](https://github.com/slepher/rebar3_reltree/actions/workflows/ci.yml?query=branch%3Amaster)
 
-**0.1.1** [![release CI](https://github.com/slepher/rebar3_reltree/actions/workflows/ci.yml/badge.svg?branch=0.1.1&event=push)](https://github.com/slepher/rebar3_reltree/actions/workflows/ci.yml?query=branch%3A0.1.1)
+**0.1.1 release CI** [![CI](https://github.com/slepher/rebar3_reltree/actions/workflows/ci.yml/badge.svg?branch=0.1.1&event=push)](https://github.com/slepher/rebar3_reltree/actions/workflows/ci.yml?query=branch%3A0.1.1)
 
 # rebar3_reltree
 
