@@ -1,2 +1,4 @@
 _build/
+_checkouts/*
+!_checkouts/rebar3_reltree
 erl_crash.dump
