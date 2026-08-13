@@ -130,8 +130,7 @@ scripts/install_reltree
 
 安装规则：
 
-- `CODEX_HOME` 已设置时，默认安装到 `$CODEX_HOME/skills/reltree`；
-- 否则安装到用户主目录下的 `.codex/skills/reltree`；
+- 默认安装到用户主目录下的 `.agents/skills/reltree`；
 - `--dest DIR` 用于显式指定 skills 父目录，命令在其下追加 `reltree`；
 - 目标已存在时默认失败，不静默覆盖；只有显式传入 `--force` 才允许替换；
 - 强制替换必须使用临时目录加原子重命名、回滚或同等安全方式，失败后不得留下半安装或新旧文件混合状态；

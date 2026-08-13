@@ -12,8 +12,8 @@ Use the target repository's current local facts and explicit user instructions. 
 For a first install from this repository, run `scripts/install_reltree` with no arguments. It is a
 directly executable escript and does not require `rebar3 escriptize`. `--dest DIR` is an optional
 explicit skills parent; the target is `DIR/reltree`. `--force` is an optional explicit replacement
-of an existing target. Without `--dest`, a set `CODEX_HOME` selects
-`$CODEX_HOME/skills/reltree`; otherwise the user home fallback is `.codex/skills/reltree`. An
+of an existing target. Without `--dest`, the target is
+`$HOME/.agents/skills/reltree`. An
 existing target fails by default. A forced replacement is complete or fails without a
 half-installed or mixed old/new target.
 

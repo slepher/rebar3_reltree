@@ -23,12 +23,13 @@ script_is_executable_and_help_is_bare_installer_test() ->
               ?assertEqual([], entries(Root))
       end).
 
-bare_install_uses_codex_home_and_reports_exact_target_test() ->
+bare_install_uses_agents_home_and_reports_exact_target_test() ->
     with_root(
       "bare",
       fun(Root) ->
               {Exit, Output} = run_script([], Root),
-              Target = filename:join([Root, "codex-home", "skills", "reltree"]),
+              Target = filename:join([Root, "home", ".agents", "skills",
+                                      "reltree"]),
               ?assertEqual(0, Exit),
               assert_install_output(Output, Target),
               assert_exact_install(Target),
@@ -65,7 +66,8 @@ existing_target_conflict_then_force_replaces_completely_test() ->
       "conflict-force",
       fun(Root) ->
               {0, _} = run_script([], Root),
-              Target = filename:join([Root, "codex-home", "skills", "reltree"]),
+              Target = filename:join([Root, "home", ".agents", "skills",
+                                      "reltree"]),
               ok = file:write_file(filename:join(Target, "SKILL.md"),
                                    <<"old skill\n">>),
               ok = file:write_file(filename:join(Target, "obsolete.txt"),
@@ -137,8 +139,7 @@ run_script(Args, Root) ->
              {spawn_executable, script_path()},
              [binary, exit_status, stderr_to_stdout,
               {args, Args},
-              {env, [{"CODEX_HOME", filename:join(Root, "codex-home")},
-                     {"HOME", filename:join(Root, "home")},
+              {env, [{"HOME", filename:join(Root, "home")},
                      {"PATH", runtime_path()}]}]),
     collect_port(Port, []).
 

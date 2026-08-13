@@ -20,21 +20,12 @@ resolve_destination(Options, EnvFun)
         {ok, Dest} ->
             {error, {invalid_destination, Dest}};
         error ->
-            case environment_value("CODEX_HOME", EnvFun) of
-                {ok, CodexHome} ->
-                    {ok, filename:absname(filename:join(CodexHome,
-                                                        "skills"))};
-                absent ->
-                    case environment_value("HOME", EnvFun) of
-                        {ok, Home} ->
-                            {ok, filename:absname(filename:join(
-                                                       [Home, ".codex",
-                                                        "skills"]))};
-                        absent -> {error, unavailable};
-                        {error, Reason} -> {error, Reason}
-                    end;
-                {error, Reason} ->
-                    {error, {invalid_codex_home, Reason}}
+            case environment_value("HOME", EnvFun) of
+                {ok, Home} ->
+                    {ok, filename:absname(filename:join(
+                                               [Home, ".agents", "skills"]))};
+                absent -> {error, unavailable};
+                {error, Reason} -> {error, Reason}
             end
     end.
 

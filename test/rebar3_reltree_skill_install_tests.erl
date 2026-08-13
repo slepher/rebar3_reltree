@@ -66,30 +66,24 @@ force_is_full_replacement_test() ->
     end.
 
 destination_precedence_is_explicit_and_bounded_test() ->
-    Env = fun("CODEX_HOME") -> "/tmp/codex-home";
-             ("HOME") -> "/tmp/user-home"
+    Env = fun("HOME") -> "/tmp/user-home";
+             (_Name) -> erlang:error(unexpected_read)
           end,
     ?assertEqual({ok, filename:absname("/tmp/explicit")},
                  rebar3_reltree_skill_install:resolve_destination(
                    #{dest => "/tmp/explicit"},
                    fun(_Name) -> erlang:error(unexpected_read) end)),
-    ?assertEqual({ok, filename:absname("/tmp/codex-home/skills")},
+    ?assertEqual({ok, filename:absname("/tmp/user-home/.agents/skills")},
                  rebar3_reltree_skill_install:resolve_destination(#{}, Env)),
-    EnvWithoutCodex = fun("CODEX_HOME") -> false;
-                         ("HOME") -> "/tmp/user-home"
-                      end,
-    ?assertEqual({ok, filename:absname("/tmp/user-home/.codex/skills")},
-                 rebar3_reltree_skill_install:resolve_destination(
-                   #{}, EnvWithoutCodex)),
     ?assertEqual({error, unavailable},
                  rebar3_reltree_skill_install:resolve_destination(
-                   #{}, fun("CODEX_HOME") -> false;
-                           ("HOME") -> false
+                   #{}, fun("HOME") -> false;
+                           (_Name) -> erlang:error(unexpected_read)
                        end)),
-    ?assertEqual({error, {invalid_codex_home, empty}},
+    ?assertEqual({error, empty},
                  rebar3_reltree_skill_install:resolve_destination(
-                   #{}, fun("CODEX_HOME") -> [];
-                           ("HOME") -> erlang:error(unexpected_read)
+                   #{}, fun("HOME") -> [];
+                           (_Name) -> erlang:error(unexpected_read)
                        end)).
 
 source_shape_is_exact_and_no_follow_test() ->
