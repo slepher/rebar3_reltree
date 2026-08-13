@@ -29,7 +29,8 @@ provider_checkvsn_metadata_test() ->
 
 provider_bgate_metadata_and_request_test() ->
     ?assertMatch([{check, undefined, "check", boolean, _},
-                  {write, undefined, "write", boolean, _}],
+                  {write, undefined, "write", boolean, _},
+                  {tag, undefined, "tag", boolean, _}],
                  rebar3_reltree_prv_bgate:option_spec()),
     Root = unique_root(),
     State0 = rebar_state:new([]),
@@ -38,6 +39,15 @@ provider_bgate_metadata_and_request_test() ->
     ?assertEqual({ok, #{command => bgate, mode => check,
                         project_root => filename:absname(Root)}},
                  rebar3_reltree_prv_bgate:request(State2)),
+    TagState = rebar_state:command_args(State1, ["bgate", "--write", "--tag"]),
+    ?assertEqual({ok, #{command => bgate, mode => write, tag => true,
+                        project_root => filename:absname(Root)}},
+                 rebar3_reltree_prv_bgate:request(TagState)),
+    ?assertMatch({error, {rebar3_reltree_prv_bgate,
+                          {tag_requires_write, check}}},
+                 rebar3_reltree_prv_bgate:do(
+                   rebar_state:command_args(State1,
+                                            ["bgate", "--check", "--tag"]))),
     ?assertMatch({error, {rebar3_reltree_prv_bgate,
                          {invalid_mode, missing}}},
                  rebar3_reltree_prv_bgate:do(

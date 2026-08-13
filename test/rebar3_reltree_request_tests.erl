@@ -104,8 +104,16 @@ bgate_parser_and_normalization_test() ->
                  rebar3_reltree_request:parse_cli(["bgate", "--check"])),
     ?assertEqual({ok, #{command => bgate, mode => write}},
                  rebar3_reltree_request:parse_cli(["bgate", "--write"])),
+    ?assertEqual({ok, #{command => bgate, mode => write, tag => true}},
+                 rebar3_reltree_request:parse_cli(
+                   ["bgate", "--write", "--tag"])),
+    ?assertEqual({ok, #{command => bgate, mode => write, tag => true}},
+                 rebar3_reltree_request:parse_cli(
+                   ["bgate", "--tag", "--write"])),
     ?assertMatch({error, {invalid_mode, missing}},
                  rebar3_reltree_request:parse_cli(["bgate"])),
+    ?assertMatch({error, {invalid_mode, missing}},
+                 rebar3_reltree_request:parse_cli(["bgate", "--tag"])),
     ?assertMatch({error, {conflicting_modes, _, _}},
                  rebar3_reltree_request:parse_cli(
                    ["bgate", "--check", "--write"])),
@@ -116,11 +124,32 @@ bgate_parser_and_normalization_test() ->
                  rebar3_reltree_request:parse_cli(["bgate", "--check", "x"])),
     ?assertMatch({error, {invalid_option, _, _}},
                  rebar3_reltree_request:parse_cli(["bgate", "--check=true"])),
+    ?assertMatch({error, {tag_requires_write, check}},
+                 rebar3_reltree_request:parse_cli(
+                   ["bgate", "--check", "--tag"])),
+    ?assertMatch({error, {tag_requires_write, check}},
+                 rebar3_reltree_request:parse_cli(
+                   ["bgate", "--tag", "--check"])),
+    ?assertMatch({error, {duplicate_option, tag}},
+                 rebar3_reltree_request:parse_cli(
+                   ["bgate", "--write", "--tag", "--tag"])),
+    ?assertMatch({error, {invalid_option, _, _}},
+                 rebar3_reltree_request:parse_cli(
+                   ["bgate", "--write", "--tag=true"])),
     {ok, Request} = rebar3_reltree_request:normalize_bgate(
                       #{cwd => "/workspace/project", mode => check}),
     ?assertEqual(bgate, maps:get(command, Request)),
     ?assertEqual(check, maps:get(mode, Request)),
-    ?assertEqual("/workspace/project", maps:get(project_root, Request)).
+    ?assertEqual("/workspace/project", maps:get(project_root, Request)),
+    {ok, TagRequest} = rebar3_reltree_request:normalize_bgate(
+                         #{cwd => "/workspace/project", mode => write,
+                           tag => true}),
+    ?assertEqual(bgate, maps:get(command, TagRequest)),
+    ?assertEqual(write, maps:get(mode, TagRequest)),
+    ?assertEqual(true, maps:get(tag, TagRequest)),
+    {ok, PlainRequest} = rebar3_reltree_request:normalize_bgate(
+                           #{cwd => "/workspace/project", mode => write}),
+    ?assertNot(maps:is_key(tag, PlainRequest)).
 
 cli_parser_failures_test() ->
     ?assertMatch({error, {invalid_command, "other"}},

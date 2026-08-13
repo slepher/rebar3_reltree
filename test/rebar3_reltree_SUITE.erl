@@ -164,10 +164,18 @@ bgate_surface(_Config) ->
         State0 = rebar_state:dir(rebar_state:new([]), Root),
         WriteState = rebar_state:command_args(State0, ["bgate", "--write"]),
         CheckState = rebar_state:command_args(State0, ["bgate", "--check"]),
+        WriteTagState = rebar_state:command_args(State0,
+                                                ["bgate", "--write", "--tag"]),
         {ok, WriteState} = rebar3_reltree_prv_bgate:do(WriteState),
         {ok, CheckState} = rebar3_reltree_prv_bgate:do(CheckState),
         {ok, Bytes} = file:read_file(README),
         ?assertMatch({_, _}, binary:match(Bytes, <<"master CI">>)),
+        ?assertMatch(nomatch, binary:match(Bytes, <<"release CI">>)),
+        {ok, WriteTagState} = rebar3_reltree_prv_bgate:do(WriteTagState),
+        {ok, TagBytes} = file:read_file(README),
+        ?assertMatch({_, _}, binary:match(TagBytes, <<"0.1.0 release CI">>)),
+        rebar3_reltree_fixtures:git_tag(Root, "0.1.0"),
+        {ok, CheckState} = rebar3_reltree_prv_bgate:do(CheckState),
         ?assertNot(filelib:is_regular(filename:join(Root, "project.md")))
     after
         rebar3_reltree_fixtures:cleanup(Root)

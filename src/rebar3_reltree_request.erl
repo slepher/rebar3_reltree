@@ -78,10 +78,17 @@ normalize_bgate(Context) when is_map(Context) ->
     case {maps:find(cwd, Context), maps:find(mode, Context)} of
         {{ok, Cwd}, {ok, Mode}} when is_list(Cwd) ->
             case Mode of
-                check -> {ok, #{command => bgate, mode => check,
-                                project_root => filename:absname(Cwd)}};
-                write -> {ok, #{command => bgate, mode => write,
-                                project_root => filename:absname(Cwd)}};
+                check ->
+                    {ok, #{command => bgate, mode => check,
+                           project_root => filename:absname(Cwd)}};
+                write ->
+                    Request0 = #{command => bgate, mode => write,
+                                 project_root => filename:absname(Cwd)},
+                    Request = case maps:get(tag, Context, false) of
+                                  true -> Request0#{tag => true};
+                                  _ -> Request0
+                              end,
+                    {ok, Request};
                 _ -> {error, {invalid_context, mode, Mode}}
             end;
         _ ->
@@ -114,6 +121,8 @@ format_error({invalid_mode, Detail}) ->
 format_error({conflicting_modes, First, Second}) ->
     io_lib:format("bgate modes --~ts and --~ts cannot be combined",
                   [First, Second]);
+format_error({tag_requires_write, Mode}) ->
+    io_lib:format("bgate option --tag requires --write (mode ~p)", [Mode]);
 format_error({invalid_option, Option, Value}) ->
     io_lib:format("invalid ~p value ~p", [Option, Value]);
 format_error({missing_option_value, Option}) ->
@@ -238,38 +247,45 @@ parse_tree_args([Option | _], _Roots, _Rev) when is_list(Option),
 parse_tree_args([Argument | _], _Roots, _Rev) ->
     {error, {extra_argument, Argument}}.
 
-parse_bgate_args([]) ->
+parse_bgate_args(Args) ->
+    parse_bgate_args(Args, undefined, false).
+
+parse_bgate_args([], undefined, _Tag) ->
     {error, {invalid_mode, missing}};
-parse_bgate_args(["--help" | _]) ->
-    {help, bgate};
-parse_bgate_args(["-h" | _]) ->
-    {help, bgate};
-parse_bgate_args(["--check"]) ->
+parse_bgate_args([], check, _Tag) ->
     {ok, #{command => bgate, mode => check}};
-parse_bgate_args(["--write"]) ->
+parse_bgate_args([], write, false) ->
     {ok, #{command => bgate, mode => write}};
-parse_bgate_args(["--check", "--check" | _]) ->
-    {error, {duplicate_option, check}};
-parse_bgate_args(["--write", "--write" | _]) ->
-    {error, {duplicate_option, write}};
-parse_bgate_args(["--check", "--write" | _]) ->
-    {error, {conflicting_modes, "check", "write"}};
-parse_bgate_args(["--write", "--check" | _]) ->
-    {error, {conflicting_modes, "write", "check"}};
-parse_bgate_args(["--check", Value | _]) ->
-    case lists:prefix("--", Value) of
-        true -> {error, {invalid_option, mode, Value}};
-        false -> {error, {extra_argument, Value}}
+parse_bgate_args([], write, true) ->
+    {ok, #{command => bgate, mode => write, tag => true}};
+parse_bgate_args(["--help" | _], _Mode, _Tag) ->
+    {help, bgate};
+parse_bgate_args(["-h" | _], _Mode, _Tag) ->
+    {help, bgate};
+parse_bgate_args(["--check" | Rest], Mode, Tag) ->
+    case {Mode, Tag} of
+        {undefined, false} -> parse_bgate_args(Rest, check, Tag);
+        {undefined, _} -> {error, {tag_requires_write, check}};
+        {check, _} -> {error, {duplicate_option, check}};
+        {write, _} -> {error, {conflicting_modes, "write", "check"}}
     end;
-parse_bgate_args(["--write", Value | _]) ->
-    case lists:prefix("--", Value) of
-        true -> {error, {invalid_option, mode, Value}};
-        false -> {error, {extra_argument, Value}}
+parse_bgate_args(["--write" | Rest], Mode, Tag) ->
+    case Mode of
+        undefined -> parse_bgate_args(Rest, write, Tag);
+        write -> {error, {duplicate_option, write}};
+        check -> {error, {conflicting_modes, "check", "write"}}
     end;
-parse_bgate_args([Option | _]) when is_list(Option), Option =/= [],
-                                    hd(Option) =:= $- ->
+parse_bgate_args(["--tag" | Rest], Mode, Tag) ->
+    case {Mode, Tag} of
+        {write, false} -> parse_bgate_args(Rest, write, true);
+        {_, true} -> {error, {duplicate_option, tag}};
+        {undefined, _} -> parse_bgate_args(Rest, undefined, true);
+        {check, _} -> {error, {tag_requires_write, check}}
+    end;
+parse_bgate_args([Option | _], _Mode, _Tag)
+  when is_list(Option), Option =/= [], hd(Option) =:= $- ->
     {error, {invalid_option, option_atom(Option), Option}};
-parse_bgate_args([Argument | _]) ->
+parse_bgate_args([Argument | _], _Mode, _Tag) ->
     {error, {extra_argument, Argument}}.
 
 option_atom("--root") -> root;

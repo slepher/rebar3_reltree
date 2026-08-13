@@ -9,10 +9,12 @@ run(Request) ->
     run(Request, #{}).
 
 -spec run(map(), map()) -> {ok, map()} | {error, term()}.
-run(#{project_root := ProjectRoot, mode := Mode}, Options)
+run(#{project_root := ProjectRoot, mode := Mode} = Request, Options)
   when (Mode =:= check orelse Mode =:= write), is_map(Options) ->
+    RunOptions = Options#{tag => maps:get(tag, Request,
+                                          maps:get(tag, Options, false))},
     Workflow = filename:join(ProjectRoot, ".github/workflows/ci.yml"),
-    case read_workflow(Workflow, Options) of
+    case read_workflow(Workflow, RunOptions) of
         absent ->
             {ok, #{status => skipped_no_workflow,
                    warnings => [#{code => skip_no_workflow,
@@ -20,7 +22,7 @@ run(#{project_root := ProjectRoot, mode := Mode}, Options)
         {error, _} = Error ->
             Error;
         present ->
-            run_with_workflow(ProjectRoot, Mode, Options)
+            run_with_workflow(ProjectRoot, Mode, RunOptions)
     end;
 run(_Request, _Options) ->
     {error, {invalid_mode, request}}.
@@ -46,6 +48,25 @@ format_error({readme_read, Path, Reason}) ->
     io_lib:format("readme_read: ~ts: ~ts", [Path, reason_text(Reason)]);
 format_error({readme_invalid, Path, Reason}) ->
     io_lib:format("readme_invalid: ~ts: ~ts", [Path, reason_text(Reason)]);
+format_error(no_app_src) ->
+    "no app.src file found";
+format_error(multiple_app_src) ->
+    "multiple app.src files found";
+format_error(invalid_app_vsn) ->
+    "app.src has an invalid or missing vsn";
+format_error(ambiguous_app_vsn) ->
+    "app.src has multiple vsn values";
+format_error({app_src_directory, Path}) ->
+    io_lib:format("unable to read app.src directory: ~ts", [Path]);
+format_error({app_src_directory_read, Path, Reason}) ->
+    io_lib:format("unable to read app.src directory: ~ts (~ts)",
+                  [Path, reason_text(Reason)]);
+format_error({app_src_read, Path, Reason}) ->
+    io_lib:format("unable to read app.src: ~ts (~ts)",
+                  [Path, reason_text(Reason)]);
+format_error({invalid_app_src_term, Terms}) ->
+    io_lib:format("app.src has an invalid application term: ~ts",
+                  [bounded_term(Terms)]);
 format_error({badge_mismatch, Failures}) ->
     ["badge_mismatch: ", format_failures(Failures)];
 format_error({equivalent_formal_tags, Tags}) ->
@@ -61,22 +82,42 @@ run_with_workflow(ProjectRoot, Mode, Options) ->
         {error, _} = Error ->
             Error;
         {ok, #{repo := Repo, formal_tags := FormalTags}} ->
-            case tag_policy(FormalTags) of
-                {error, _} = Error ->
-                    case Mode of
-                        write -> Error;
-                        check ->
+            case Mode of
+                check ->
+                    case tag_policy(FormalTags) of
+                        {error, _} ->
                             run_readme_mode(ProjectRoot, Mode, Repo,
                                             FormalTags,
                                             #{release => equivalent,
                                               tags => equivalent_tags_list(
                                                        FormalTags)},
-                                            Options)
+                                            Options);
+                        {ok, Policy} ->
+                            run_readme_mode(ProjectRoot, Mode, Repo,
+                                            FormalTags, Policy, Options)
                     end;
-                {ok, Policy} ->
-                    run_readme_mode(ProjectRoot, Mode, Repo, FormalTags,
-                                    Policy, Options)
+                write ->
+                    case write_policy(ProjectRoot, Options) of
+                        {ok, Policy} ->
+                            run_readme_mode(ProjectRoot, Mode, Repo,
+                                            FormalTags, Policy, Options);
+                        {error, _} = Error ->
+                            Error
+                    end
             end
+    end.
+
+write_policy(ProjectRoot, Options) ->
+    case maps:get(tag, Options, false) of
+        true ->
+            case rebar3_reltree_config:app_identity(ProjectRoot) of
+                {ok, #{app_vsn := AppVsn}} ->
+                    {ok, #{release => {tag, AppVsn}}};
+                {error, _} = Error ->
+                    Error
+            end;
+        _ ->
+            {ok, #{release => none}}
     end.
 
 run_readme_mode(ProjectRoot, check, Repo, FormalTags, Policy, Options) ->
@@ -677,3 +718,10 @@ reason_text(Reason) when is_list(Reason) ->
     end;
 reason_text(Reason) ->
     lists:flatten(io_lib:format("~p", [Reason])).
+
+bounded_term(Term) ->
+    Text = lists:flatten(io_lib:format("~tp", [Term])),
+    case length(Text) > 512 of
+        true -> lists:sublist(Text, 512) ++ "...";
+        false -> Text
+    end.

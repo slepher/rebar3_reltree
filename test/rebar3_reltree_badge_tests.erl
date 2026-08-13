@@ -53,39 +53,90 @@ no_formal_tag_writes_master_only_and_preserves_content_test() ->
         rebar3_reltree_fixtures:cleanup(Root)
     end.
 
-formal_tag_policy_is_numeric_and_preserves_real_tag_test() ->
+write_without_tag_master_only_even_with_reachable_tags_test() ->
+    Root = fixture("https://github.com/acme/master-only.git"),
+    try
+        rebar3_reltree_fixtures:git_tag(Root, "1.0.0"),
+        README = filename:join(Root, "README.md"),
+        ok = file:write_file(README,
+                             list_to_binary(master("acme/master-only") ++
+                                             "\n\n" ++
+                                             release("acme/master-only",
+                                                     "1.0.0") ++ "\n")),
+        {ok, #{status := written}} = run(Root, write, #{}),
+        Text = read(README),
+        ?assertNotEqual(none, binary:match(Text,
+                                           list_to_binary(master(
+                                             "acme/master-only")))),
+        ?assertEqual(nomatch, binary:match(Text, <<"release CI">>)),
+        ?assertMatch({error, {badge_mismatch, [{_, [missing]}]}},
+                     run(Root, check, #{}))
+    after
+        rebar3_reltree_fixtures:cleanup(Root)
+    end.
+
+write_with_tag_uses_app_src_version_and_ignores_reachable_tags_test() ->
+    Root = fixture("https://github.com/acme/plan-tag.git"),
+    try
+        rebar3_reltree_fixtures:git_tag(Root, "9.9.9"),
+        README = filename:join(Root, "README.md"),
+        ok = file:write_file(README, <<"content\n">>),
+        {ok, #{status := written}} = run(Root, write, #{tag => true}),
+        Text = read(README),
+        ?assertNotEqual(none, binary:match(Text,
+                                           list_to_binary(master(
+                                             "acme/plan-tag")))),
+        ?assertNotEqual(none, binary:match(Text,
+                                           list_to_binary(release(
+                                             "acme/plan-tag", "0.1.0")))),
+        ?assertEqual(nomatch, binary:match(Text, <<"9.9.9 release CI">>))
+    after
+        rebar3_reltree_fixtures:cleanup(Root)
+    end.
+
+write_with_tag_requires_app_src_test() ->
+    Root = fixture("https://github.com/acme/no-app.git"),
+    try
+        remove_path(filename:join([Root, "src", "bgate_fixture.app.src"])),
+        README = filename:join(Root, "README.md"),
+        ok = file:write_file(README, <<"content\n">>),
+        ?assertMatch({error, no_app_src}, run(Root, write, #{tag => true})),
+        ?assertEqual(<<"content\n">>, read(README))
+    after
+        rebar3_reltree_fixtures:cleanup(Root)
+    end.
+
+check_selects_numeric_highest_reachable_tag_test() ->
     Root = fixture("git@github.com:acme/tagged.git"),
     try
         lists:foreach(fun(Tag) -> rebar3_reltree_fixtures:git_tag(Root, Tag)
                       end, ["1.9.9", "1.10.0-rc.1", "check-1.99.0",
                             "1.10.0"]),
         README = filename:join(Root, "README.md"),
-        ok = file:write_file(README, <<"content\n">>),
-        {ok, #{status := written}} = run(Root, write, #{}),
-        Text = read(README),
-        ?assertNotEqual(none, binary:match(Text,
-                                           list_to_binary(master("acme/tagged")))),
-        ?assertNotEqual(none, binary:match(Text,
-                                           list_to_binary(release("acme/tagged",
-                                                                  "1.10.0")))),
-        ?assertEqual(nomatch, binary:match(Text, <<"1.9.9 release CI">>)),
-        ?assertEqual(nomatch, binary:match(Text, <<"1.10.0-rc.1 release CI">>)),
-        ?assertEqual(nomatch, binary:match(Text, <<"check-1.99.0">>))
+        ok = file:write_file(
+               README,
+               list_to_binary(master("acme/tagged") ++ "\n\n" ++
+                              release("acme/tagged", "1.10.0") ++ "\n")),
+        ?assertMatch({ok, #{status := checked}}, run(Root, check, #{})),
+        ok = file:write_file(
+               README,
+               list_to_binary(master("acme/tagged") ++ "\n\n" ++
+                              release("acme/tagged", "1.9.9") ++ "\n")),
+        ?assertMatch({error, {badge_mismatch, _}}, run(Root, check, #{}))
     after
         rebar3_reltree_fixtures:cleanup(Root)
     end.
 
-v_formal_tag_uses_display_version_and_real_branch_test() ->
+v_formal_tag_check_uses_display_version_and_real_branch_test() ->
     Root = fixture("https://github.com/acme/vtag.git"),
     try
         rebar3_reltree_fixtures:git_tag(Root, "v2.3.4"),
         README = filename:join(Root, "README.md"),
-        ok = file:write_file(README, <<"content">>),
-        {ok, _} = run(Root, write, #{}),
-        Text = read(README),
-        ?assertNotEqual(none, binary:match(Text, <<"2.3.4 release CI">>)),
-        ?assertNotEqual(none, binary:match(Text, <<"branch=v2.3.4">>)),
-        ?assertNotEqual(none, binary:match(Text, <<"branch%3Av2.3.4">>))
+        ok = file:write_file(
+               README,
+               list_to_binary(master("acme/vtag") ++ "\n\n" ++
+                              release("acme/vtag", "v2.3.4") ++ "\n")),
+        ?assertMatch({ok, #{status := checked}}, run(Root, check, #{}))
     after
         rebar3_reltree_fixtures:cleanup(Root)
     end.
@@ -109,7 +160,7 @@ check_is_read_only_on_success_and_mismatch_test() ->
         rebar3_reltree_fixtures:cleanup(Root)
     end.
 
-write_replaces_managed_lines_is_idempotent_and_preserves_crlf_test() ->
+write_with_tag_replaces_managed_lines_is_idempotent_and_preserves_crlf_test() ->
     Root = fixture("https://github.com/acme/preserve.git"),
     try
         rebar3_reltree_fixtures:git_tag(Root, "3.0.0"),
@@ -123,29 +174,29 @@ write_replaces_managed_lines_is_idempotent_and_preserves_crlf_test() ->
                                  unicode:characters_to_binary("正文\r\n")]),
         ok = file:write_file(README, Body),
         ok = file:write_file(Chinese, <<"中文正文\n">>),
-        {ok, #{status := written}} = run(Root, write, #{}),
+        {ok, #{status := written}} = run(Root, write, #{tag => true}),
         First = read(README),
         ?assertNotEqual(nomatch, binary:match(First, <<"\r\n">>)),
         ?assertNotEqual(none, binary:match(First,
                                            list_to_binary(release("acme/preserve",
-                                                                  "3.0.0")))),
+                                                                  "0.1.0")))),
         ?assertEqual(nomatch, binary:match(First, list_to_binary(Old))),
         ?assertNotEqual(none, binary:match(First, <<"Other">>)),
         ?assertNotEqual(none, binary:match(First, <<"正文">>)),
-        {ok, #{status := written}} = run(Root, write, #{}),
+        {ok, #{status := written}} = run(Root, write, #{tag => true}),
         ?assertEqual(First, read(README)),
         ChineseAfter = read(Chinese),
         ?assertNotEqual(nomatch, binary:match(ChineseAfter,
                                               <<"中文正文\n">>)),
         ?assertNotEqual(nomatch, binary:match(ChineseAfter,
                                               list_to_binary(release(
-                                                "acme/preserve", "3.0.0")))),
+                                                "acme/preserve", "0.1.0")))),
         ?assertEqual(Master, Master)
     after
         rebar3_reltree_fixtures:cleanup(Root)
     end.
 
-write_preserves_gap_bytes_between_non_adjacent_managed_lines_test() ->
+write_with_tag_preserves_gap_bytes_between_non_adjacent_managed_lines_test() ->
     Root = fixture("https://github.com/acme/gap.git"),
     try
         rebar3_reltree_fixtures:git_tag(Root, "2.0.0"),
@@ -157,9 +208,9 @@ write_preserves_gap_bytes_between_non_adjacent_managed_lines_test() ->
                README,
                list_to_binary("before\n" ++ OldMaster ++ "\n\n" ++ Other ++
                               "\n\n" ++ OldRelease ++ "\nafter\n")),
-        {ok, #{status := written}} = run(Root, write, #{}),
+        {ok, #{status := written}} = run(Root, write, #{tag => true}),
         Expected = list_to_binary("before\n" ++ master("acme/gap") ++
-                                  "\n\n" ++ release("acme/gap", "2.0.0") ++
+                                  "\n\n" ++ release("acme/gap", "0.1.0") ++
                                   "\n\n" ++ Other ++ "\n\nafter\n"),
         ?assertEqual(Expected, read(README))
     after
@@ -227,7 +278,7 @@ chinese_managed_block_must_match_but_prose_may_differ_test() ->
         rebar3_reltree_fixtures:cleanup(Root)
     end.
 
-equivalent_tags_write_fails_before_writes_and_check_warns_test() ->
+equivalent_tags_check_warns_and_write_ignores_tags_test() ->
     Root = fixture("https://github.com/acme/equivalent.git"),
     try
         rebar3_reltree_fixtures:git_tag(Root, "1.2.3"),
@@ -240,10 +291,6 @@ equivalent_tags_write_fails_before_writes_and_check_warns_test() ->
                               release("acme/equivalent", "v1.2.3") ++ "\n"),
         ok = file:write_file(English, Bare),
         ok = file:write_file(Chinese, VTag),
-        Before = snapshot(Root, [English, Chinese]),
-        ?assertMatch({error, {equivalent_formal_tags, [_, _]}},
-                     run(Root, write, #{})),
-        ?assertEqual(Before, snapshot(Root, [English, Chinese])),
         ?assertMatch({error, {badge_mismatch, _}}, run(Root, check, #{})),
         ok = file:write_file(Chinese, Bare),
         {ok, #{status := checked, warnings := [Warning]}} =
@@ -253,7 +300,19 @@ equivalent_tags_write_fails_before_writes_and_check_warns_test() ->
                         rebar3_reltree_badge:format_result(
                           #{warnings => [Warning]})),
         ?assert(string:str(WarningText, "1.2.3") > 0),
-        ?assert(string:str(WarningText, "v1.2.3") > 0)
+        ?assert(string:str(WarningText, "v1.2.3") > 0),
+        {ok, #{status := written}} = run(Root, write, #{}),
+        Plain = read(English),
+        ?assertNotEqual(none, binary:match(Plain,
+                                           list_to_binary(master(
+                                             "acme/equivalent")))),
+        ?assertEqual(nomatch, binary:match(Plain, <<"release CI">>)),
+        {ok, #{status := written}} = run(Root, write, #{tag => true}),
+        WithTag = read(English),
+        ?assertNotEqual(none, binary:match(WithTag,
+                                           list_to_binary(release(
+                                             "acme/equivalent", "0.1.0")))),
+        ok
     after
         rebar3_reltree_fixtures:cleanup(Root)
     end.
@@ -316,9 +375,18 @@ provider_and_escript_request_parity_test() ->
         ?assertEqual(ProviderRequest,
                      #{command => bgate, mode => check,
                        project_root => filename:absname(Root)}),
+        TagState = rebar_state:command_args(State1, ["bgate", "--write",
+                                                     "--tag"]),
+        {ok, TagRequest} = rebar3_reltree_prv_bgate:request(TagState),
+        ?assertEqual(TagRequest,
+                     #{command => bgate, mode => write, tag => true,
+                       project_root => filename:absname(Root)}),
         ?assert(string:str(lists:flatten(rebar3_reltree_prv_bgate:help()),
                            "Usage: reltree bgate") > 0),
-        ?assertMatch({ok, _}, rebar3_reltree_prv_bgate:do(State2))
+        ?assert(string:str(lists:flatten(rebar3_reltree_prv_bgate:help()),
+                           "--tag") > 0),
+        ?assertMatch({ok, _}, rebar3_reltree_prv_bgate:do(State2)),
+        ?assertMatch({ok, _}, rebar3_reltree_prv_bgate:do(TagState))
     after
         rebar3_reltree_fixtures:cleanup(Root)
     end.

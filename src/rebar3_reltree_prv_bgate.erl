@@ -12,7 +12,9 @@ option_spec() ->
     [{check, undefined, "check", boolean,
       "Check local README CI badges."},
      {write, undefined, "write", boolean,
-      "Write local README CI badges."}].
+      "Write local README CI badges (master only)."},
+     {tag, undefined, "tag", boolean,
+      "With --write, also write the release CI badge for the app.src version."}].
 
 -spec do(term()) -> term().
 do(State) ->
@@ -46,9 +48,10 @@ request(State) ->
                Rest when is_list(Rest) -> Rest
            end,
     case rebar3_reltree_request:parse_cli(["bgate" | Args]) of
-        {ok, #{mode := Mode}} ->
+        {ok, #{mode := Mode} = Parsed} ->
             rebar3_reltree_request:normalize_bgate(
-              #{cwd => ProjectRoot, mode => Mode});
+              #{cwd => ProjectRoot, mode => Mode,
+                tag => maps:get(tag, Parsed, false)});
         {help, bgate} ->
             {help, bgate};
         {error, _} = Error ->
@@ -60,6 +63,7 @@ provider_error(Reason) ->
 
 help() ->
     ["Usage: reltree bgate [options]\n\n",
-     "Options (exactly one required):\n",
-     "  --check  verify local README CI badges\n",
-     "  --write  update local README CI badges\n"].
+     "Options (exactly one mode required):\n",
+     "  --check        verify local README CI badges\n",
+     "  --write        update local README CI badges (master only)\n",
+     "  --write --tag  also write the release CI badge for the app.src version\n"].
