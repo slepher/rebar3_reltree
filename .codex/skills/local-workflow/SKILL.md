@@ -1,9 +1,23 @@
 ---
 name: local-workflow
-description: Execute or resume repository initiatives through versioned plan-N.md files plus durable status.md and commit.md artifacts, with Sol planning and reviewing small tasks, Luna implementing and self-testing, optional risk-triggered independent verification, and the dispatcher owning recovery, status, staging, and commits. Use for multi-task project work, interruption recovery, one-task-at-a-time implementation, review correction commits, design-plan revisions, and auditable code history. Use $delegate for all worker routing.
+description: Govern explicitly requested repository initiatives through versioned plan-N.md files plus durable status.md and commit.md artifacts, with Sol planning and review, Luna implementation and self-test, optional risk-triggered verification, and dispatcher-owned recovery, staging, and commits. Use only when the user explicitly invokes $local-workflow, explicitly requests this durable planned/reviewed/committed workflow, or asks to resume an unfinished initiative already governed by it. Do not use for ordinary localized edits, questions, diagnostics, or tests merely because workflow artifacts or uncommitted changes exist. Referring to, inspecting, or editing this skill does not invoke its repository workflow. Use $delegate for all worker routing after activation.
 ---
 
 # Local Workflow
+
+## Activation gate
+
+Before reading any initiative artifact, confirm that the user explicitly invoked
+`$local-workflow`, explicitly requested this governed workflow, or asked to
+resume an unfinished initiative already governed by it. If none applies, stop
+using this skill and handle the request through the normal task workflow; do not
+create, reopen, or recover an initiative.
+
+Do not activate merely because the repository contains `docs/plan/`,
+`status.md`, prior workflow artifacts, or uncommitted changes, or because a
+localized change touches an area covered by a completed initiative. Questions
+about, inspections of, and edits to this skill are not requests to execute it
+unless the user separately asks to run the governed repository workflow.
 
 Run one independently implementable, testable, reviewable, committable task at
 a time. Use `$delegate` for worker routing, permissions, and result verification.
