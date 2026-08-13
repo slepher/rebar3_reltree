@@ -158,7 +158,10 @@ bgate_surface(_Config) ->
           Root, "https://github.com/acme/ct-bgate.git"),
         rebar3_reltree_fixtures:write_file(
           filename:join([Root, ".github", "workflows", "ci.yml"]),
-          <<"name: ci\n">>),
+          <<"name: master\n">>),
+        rebar3_reltree_fixtures:write_file(
+          filename:join([Root, ".github", "workflows", "release.yml"]),
+          <<"name: release-0.1.0\n">>),
         README = filename:join(Root, "README.md"),
         rebar3_reltree_fixtures:write_file(README, <<"content\n">>),
         State0 = rebar_state:dir(rebar_state:new([]), Root),
@@ -169,12 +172,12 @@ bgate_surface(_Config) ->
         {ok, WriteState} = rebar3_reltree_prv_bgate:do(WriteState),
         {ok, CheckState} = rebar3_reltree_prv_bgate:do(CheckState),
         {ok, Bytes} = file:read_file(README),
-        ?assertMatch({_, _}, binary:match(Bytes, <<"master CI">>)),
-        ?assertMatch(nomatch, binary:match(Bytes, <<"release CI">>)),
+        ?assertMatch({_, _}, binary:match(Bytes, <<"actions/workflows/ci.yml">>)),
+        ?assertMatch(nomatch, binary:match(Bytes, <<"release.yml">>)),
         {ok, WriteTagState} = rebar3_reltree_prv_bgate:do(WriteTagState),
         {ok, TagBytes} = file:read_file(README),
         ?assertMatch({_, _}, binary:match(TagBytes,
-                                         <<"**0.1.0 release CI** [![CI]">>)),
+                                         <<"actions/workflows/release.yml">>)),
         rebar3_reltree_fixtures:git_tag(Root, "0.1.0"),
         {ok, CheckState} = rebar3_reltree_prv_bgate:do(CheckState),
         ?assertNot(filelib:is_regular(filename:join(Root, "project.md")))

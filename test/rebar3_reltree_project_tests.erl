@@ -109,15 +109,15 @@ ci_badges_are_read_only_facts_and_mismatch_changes_status_test() ->
                                             "https://github.com/owner/repo.git"),
         rebar3_reltree_fixtures:write_file(
           filename:join([Current, ".github", "workflows", "ci.yml"]),
-          <<"name: ci\n">>),
-        Master = "**master CI** [![CI](https://github.com/owner/repo/actions/"
+          <<"name: master\n">>),
+        Master = "[![CI](https://github.com/owner/repo/actions/"
                  "workflows/ci.yml/badge.svg?branch=master&event=push)]("
                  "https://github.com/owner/repo/actions/workflows/ci.yml?"
                  "query=branch%3Amaster)",
-        Release = "**1.2.0 release CI** [![CI](https://github.com/owner/repo/"
-                  "actions/workflows/ci.yml/badge.svg?branch=v1.2.0&"
+        Release = "[![CI](https://github.com/owner/repo/"
+                  "actions/workflows/release.yml/badge.svg?branch=v1.2.0&"
                   "event=push)](https://github.com/owner/repo/actions/"
-                  "workflows/ci.yml?query=branch%3Av1.2.0)",
+                  "workflows/release.yml?query=branch%3Av1.2.0)",
         Content = list_to_binary(Master ++ "\n" ++ Release ++ "\n"),
         rebar3_reltree_fixtures:write_file(
           filename:join(Current, "README.md"), Content),

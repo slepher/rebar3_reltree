@@ -26,6 +26,72 @@ no_workflow_skips_both_modes_without_other_reads_or_writes_test() ->
         rebar3_reltree_fixtures:cleanup(Root)
     end.
 
+write_tag_updates_release_workflow_and_uses_path_badges_test() ->
+    Root = fixture("https://github.com/acme/split.git"),
+    try
+        CI = workflow(Root),
+        ReleaseWorkflow = release_workflow(Root),
+        README = filename:join(Root, "README.md"),
+        CIContent = read(CI),
+        ok = file:write_file(ReleaseWorkflow,
+                             <<"name: release-0.0.9 # preserve\n",
+                               "jobs:\n  build:\n    name: nested\n">>),
+        ok = file:write_file(README, <<"body\n">>),
+        {ok, #{status := written}} = run(Root, write, #{tag => true}),
+        ?assertEqual(CIContent, read(CI)),
+        ?assertEqual(<<"name: release-0.1.0 # preserve\n",
+                       "jobs:\n  build:\n    name: nested\n">>,
+                     read(ReleaseWorkflow)),
+        Text = read(README),
+        ?assertNotEqual(none, binary:match(Text,
+                                           list_to_binary(master("acme/split")))),
+        ?assertNotEqual(none, binary:match(Text,
+                                           list_to_binary(release("acme/split",
+                                                                  "0.1.0")))),
+        ?assertEqual(nomatch, binary:match(Text, <<"**master CI**">>)),
+        ?assertEqual(nomatch, binary:match(Text, <<"release CI**">>))
+    after
+        rebar3_reltree_fixtures:cleanup(Root)
+    end.
+
+workflow_name_validation_rejects_duplicates_and_collections_test() ->
+    Root = fixture("https://github.com/acme/workflow-name.git"),
+    try
+        CI = workflow(Root),
+        ok = file:write_file(filename:join(Root, "README.md"), <<"body\n">>),
+        ok = file:write_file(CI, <<"name: master\nname: duplicate\n">>),
+        ?assertMatch({error, {workflow_invalid, CI,
+                             duplicate_top_level_name}},
+                     run(Root, check, #{})),
+        ok = file:write_file(CI, <<"name: |\n  master\n">>),
+        ?assertMatch({error, {workflow_invalid, CI,
+                             non_scalar_top_level_name}},
+                     run(Root, check, #{})),
+        ok = file:write_file(CI, <<"name: master\njobs:\n  build:\n",
+                                 "    name: nested\n">>),
+        ok = file:write_file(filename:join(Root, "README.md"),
+                             list_to_binary(master("acme/workflow-name") ++
+                                             "\n")),
+        ?assertMatch({ok, #{status := checked}}, run(Root, check, #{}))
+    after
+        rebar3_reltree_fixtures:cleanup(Root)
+    end.
+
+write_tag_requires_existing_release_workflow_without_readme_write_test() ->
+    Root = fixture("https://github.com/acme/missing-release-workflow.git"),
+    try
+        ReleaseWorkflow = release_workflow(Root),
+        README = filename:join(Root, "README.md"),
+        ok = file:write_file(README, <<"body\n">>),
+        Before = read(README),
+        ok = file:delete(ReleaseWorkflow),
+        ?assertMatch({error, {workflow_invalid, ReleaseWorkflow, missing}},
+                     run(Root, write, #{tag => true})),
+        ?assertEqual(Before, read(README))
+    after
+        rebar3_reltree_fixtures:cleanup(Root)
+    end.
+
 no_formal_tag_writes_master_only_and_preserves_content_test() ->
     Root = fixture("https://github.com/acme/no-tag.git"),
     try
@@ -69,7 +135,7 @@ write_without_tag_master_only_even_with_reachable_tags_test() ->
                                            list_to_binary(master(
                                              "acme/master-only")))),
         ?assertEqual(nomatch, binary:match(Text, <<"release CI">>)),
-        ?assertMatch({error, {badge_mismatch, [{_, [missing]}]}},
+        ?assertMatch({error, {workflow_invalid, _, _}},
                      run(Root, check, #{}))
     after
         rebar3_reltree_fixtures:cleanup(Root)
@@ -112,6 +178,7 @@ check_selects_numeric_highest_reachable_tag_test() ->
         lists:foreach(fun(Tag) -> rebar3_reltree_fixtures:git_tag(Root, Tag)
                       end, ["1.9.9", "1.10.0-rc.1", "check-1.99.0",
                             "1.10.0"]),
+        set_release_workflow(Root, "1.10.0"),
         README = filename:join(Root, "README.md"),
         ok = file:write_file(
                README,
@@ -131,6 +198,7 @@ v_formal_tag_check_uses_display_version_and_real_branch_test() ->
     Root = fixture("https://github.com/acme/vtag.git"),
     try
         rebar3_reltree_fixtures:git_tag(Root, "v2.3.4"),
+        set_release_workflow(Root, "v2.3.4"),
         README = filename:join(Root, "README.md"),
         ok = file:write_file(
                README,
@@ -145,13 +213,16 @@ check_is_read_only_on_success_and_mismatch_test() ->
     Root = fixture("https://github.com/acme/check.git"),
     try
         rebar3_reltree_fixtures:git_tag(Root, "1.0.0"),
+        set_release_workflow(Root, "1.0.0"),
         README = filename:join(Root, "README.md"),
         Content = list_to_binary(master("acme/check") ++ "\n\n" ++
                                  release("acme/check", "1.0.0") ++ "\nprose\n"),
         ok = file:write_file(README, Content),
-        Before = snapshot(Root, [README, workflow(Root)]),
+        Before = snapshot(Root, [README, workflow(Root),
+                                 release_workflow(Root)]),
         {ok, #{status := checked}} = run(Root, check, #{}),
-        ?assertEqual(Before, snapshot(Root, [README, workflow(Root)])),
+        ?assertEqual(Before, snapshot(Root, [README, workflow(Root),
+                                             release_workflow(Root)])),
         ok = file:write_file(README, <<"wrong\n">>),
         MismatchBefore = snapshot_file(README),
         ?assertMatch({error, {badge_mismatch, _}}, run(Root, check, #{})),
@@ -224,7 +295,7 @@ write_preserves_last_bare_cr_byte_test() ->
         Original = <<"tail", 13>>,
         ok = file:write_file(README, Original),
         {ok, #{status := written}} = run(Root, write, #{}),
-        Expected = <<"**master CI** [![CI](https://github.com/acme/bare-cr/actions/workflows/ci.yml/badge.svg?branch=master&event=push)](https://github.com/acme/bare-cr/actions/workflows/ci.yml?query=branch%3Amaster)\n\n",
+        Expected = <<"[![CI](https://github.com/acme/bare-cr/actions/workflows/ci.yml/badge.svg?branch=master&event=push)](https://github.com/acme/bare-cr/actions/workflows/ci.yml?query=branch%3Amaster)\n\n",
                     "tail", 13>>,
         ?assertEqual(Expected, read(README))
     after
@@ -248,6 +319,7 @@ check_reports_missing_release_badge_test() ->
     Root = fixture("https://github.com/acme/missing-release.git"),
     try
         rebar3_reltree_fixtures:git_tag(Root, "1.0.0"),
+        set_release_workflow(Root, "1.0.0"),
         README = filename:join(Root, "README.md"),
         ok = file:write_file(README,
                              list_to_binary(master("acme/missing-release") ++
@@ -262,6 +334,7 @@ chinese_managed_block_must_match_but_prose_may_differ_test() ->
     Root = fixture("https://github.com/acme/zh.git"),
     try
         rebar3_reltree_fixtures:git_tag(Root, "v4.5.6"),
+        set_release_workflow(Root, "v4.5.6"),
         English = filename:join(Root, "README.md"),
         Chinese = filename:join(Root, "README.zh.md"),
         Block = list_to_binary(master("acme/zh") ++ "\n\n" ++
@@ -328,7 +401,7 @@ read_and_write_errors_are_bounded_and_path_specific_test() ->
         ?assertMatch({error, {workflow_invalid, Workflow, _}},
                      run(Root, check, #{})),
         remove_path(Workflow),
-        rebar3_reltree_fixtures:write_file(Workflow, <<"name: ci\n">>),
+        rebar3_reltree_fixtures:write_file(Workflow, <<"name: master\n">>),
         ok = file:delete(README),
         ?assertMatch({error, {readme_read, README, enoent}},
                      run(Root, check, #{})),
@@ -358,8 +431,8 @@ write_order_and_partial_second_file_failure_test() ->
         ?assertMatch({error, {readme_write, Chinese, replace,
                               injected_second_file}},
                      run(Root, write, #{atomic_write => Writer})),
-        ?assertEqual([README, Chinese], get(write_calls)),
-        ?assertNotEqual(<<"English\n">>, read(README)),
+        ?assertEqual([README, Chinese, README], get(write_calls)),
+        ?assertEqual(<<"English\n">>, read(README)),
         ?assertEqual(BeforeZh, read(Chinese))
     after
         rebar3_reltree_fixtures:cleanup(Root)
@@ -428,24 +501,29 @@ fixture(Origin) ->
     Root = rebar3_reltree_fixtures:new_root(),
     rebar3_reltree_fixtures:write_project(Root, bgate_fixture, [], "0.1.0"),
     rebar3_reltree_fixtures:add_origin(Root, Origin),
-    rebar3_reltree_fixtures:write_file(workflow(Root), <<"name: ci\n">>),
+    rebar3_reltree_fixtures:write_file(workflow(Root), <<"name: master\n">>),
+    rebar3_reltree_fixtures:write_file(release_workflow(Root),
+                                       <<"name: release-0.1.0\n">>),
     Root.
 
 workflow(Root) -> filename:join([Root, ".github", "workflows", "ci.yml"]).
 
+release_workflow(Root) ->
+    filename:join([Root, ".github", "workflows", "release.yml"]).
+
+set_release_workflow(Root, Tag) ->
+    rebar3_reltree_fixtures:write_file(
+      release_workflow(Root), list_to_binary("name: release-" ++ Tag ++ "\n")).
+
 master(Repo) ->
-    "**master CI** [![CI](https://github.com/" ++ Repo ++
+    "[![CI](https://github.com/" ++ Repo ++
     "/actions/workflows/ci.yml/badge.svg?branch=master&event=push)](https://github.com/" ++
     Repo ++ "/actions/workflows/ci.yml?query=branch%3Amaster)".
 
 release(Repo, Tag) ->
-    Display = case Tag of
-                  [$v | Rest] -> Rest;
-                  _ -> Tag
-              end,
-    "**" ++ Display ++ " release CI** [![CI](https://github.com/" ++ Repo ++
-    "/actions/workflows/ci.yml/badge.svg?branch=" ++ Tag ++ "&event=push)](https://github.com/" ++
-    Repo ++ "/actions/workflows/ci.yml?query=branch%3A" ++ Tag ++ ")".
+    "[![CI](https://github.com/" ++ Repo ++
+    "/actions/workflows/release.yml/badge.svg?branch=" ++ Tag ++ "&event=push)](https://github.com/" ++
+    Repo ++ "/actions/workflows/release.yml?query=branch%3A" ++ Tag ++ ")".
 
 legacy_release(Repo, Tag) ->
     "[![" ++ Tag ++ " release CI](https://github.com/" ++ Repo ++

@@ -10,11 +10,11 @@ init(State) ->
 -spec option_spec() -> [tuple()].
 option_spec() ->
     [{check, undefined, "check", boolean,
-      "Check local README CI badges."},
+      "Check workflow names and local README CI badges."},
      {write, undefined, "write", boolean,
-      "Write local README CI badges (master only)."},
+      "Write the master README CI badge."},
      {tag, undefined, "tag", boolean,
-      "With --write, also write the release CI badge for the app.src version."}].
+      "With --write, prepare release.yml and write the release badge."}].
 
 -spec do(term()) -> term().
 do(State) ->
@@ -64,6 +64,6 @@ provider_error(Reason) ->
 help() ->
     ["Usage: reltree bgate [options]\n\n",
      "Options (exactly one mode required):\n",
-     "  --check        verify local README CI badges\n",
-     "  --write        update local README CI badges (master only)\n",
-     "  --write --tag  also write the release CI badge for the app.src version\n"].
+     "  --check        verify workflow names and local README CI badges\n",
+     "  --write        update the master README CI badge\n",
+     "  --write --tag  prepare release.yml and write the release badge\n"].

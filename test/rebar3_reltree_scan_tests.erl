@@ -176,6 +176,14 @@ missing_and_file_scan_roots_warn_and_continue_test() ->
     end.
 
 unreadable_explicit_root_warns_once_without_candidate_test() ->
+    case running_as_root() of
+        true ->
+            ok;
+        false ->
+            unreadable_explicit_root_warns_once_without_candidate()
+    end.
+
+unreadable_explicit_root_warns_once_without_candidate() ->
     Workspace = rebar3_reltree_fixtures:new_root(),
     try
         Current = filename:join(Workspace, "current"),
@@ -195,4 +203,10 @@ unreadable_explicit_root_warns_once_without_candidate_test() ->
     after
         _ = file:change_mode(filename:join(Workspace, "unreadable"), 8#755),
         rebar3_reltree_fixtures:cleanup(Workspace)
+    end.
+
+running_as_root() ->
+    case os:type() of
+        {unix, _} -> string:trim(os:cmd("id -u")) =:= "0";
+        _ -> false
     end.

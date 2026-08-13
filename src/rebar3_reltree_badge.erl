@@ -21,8 +21,16 @@ run(#{project_root := ProjectRoot, mode := Mode} = Request, Options)
                                   path => ".github/workflows/ci.yml"}]}};
         {error, _} = Error ->
             Error;
-        present ->
-            run_with_workflow(ProjectRoot, Mode, RunOptions)
+        {present, Content} ->
+            case workflow_name(Content) of
+                {ok, "master"} ->
+                    run_with_workflow(ProjectRoot, Mode, RunOptions);
+                {ok, Name} ->
+                    {error, {workflow_invalid, Workflow,
+                             {name_mismatch, "master", Name}}};
+                {error, Reason} ->
+                    {error, {workflow_invalid, Workflow, Reason}}
+            end
     end;
 run(_Request, _Options) ->
     {error, {invalid_mode, request}}.
@@ -74,6 +82,9 @@ format_error({equivalent_formal_tags, Tags}) ->
 format_error({readme_write, Path, Stage, Reason}) ->
     io_lib:format("readme_write: ~ts (~p): ~ts",
                   [Path, Stage, reason_text(Reason)]);
+format_error({workflow_write, Path, Stage, Reason}) ->
+    io_lib:format("workflow_write: ~ts (~p): ~ts",
+                  [Path, Stage, reason_text(Reason)]);
 format_error(Reason) ->
     io_lib:format("bgate_failed: ~ts", [reason_text(Reason)]).
 
@@ -99,8 +110,17 @@ run_with_workflow(ProjectRoot, Mode, Options) ->
                 write ->
                     case write_policy(ProjectRoot, Options) of
                         {ok, Policy} ->
-                            run_readme_mode(ProjectRoot, Mode, Repo,
-                                            FormalTags, Policy, Options);
+                            case release_workflow(ProjectRoot, Mode, Policy,
+                                                  Options) of
+                                {ok, WorkflowChanges} ->
+                                    run_readme_mode(
+                                      ProjectRoot, Mode, Repo, FormalTags,
+                                      Policy,
+                                      Options#{workflow_changes =>
+                                                   WorkflowChanges});
+                                {error, _} = Error ->
+                                    Error
+                            end;
                         {error, _} = Error ->
                             Error
                     end
@@ -121,18 +141,24 @@ write_policy(ProjectRoot, Options) ->
     end.
 
 run_readme_mode(ProjectRoot, check, Repo, FormalTags, Policy, Options) ->
-    case read_readmes(ProjectRoot, Options) of
+    case release_workflow(ProjectRoot, check, Policy, Options) of
         {error, _} = Error ->
             Error;
-        {ok, Files} ->
-            Expected = expected(Repo, FormalTags, Policy),
-            Results = [{File, check_file(File, Expected)} || File <- Files],
-            case check_results(Results, Policy) of
-                ok ->
-                    {ok, #{status => checked,
-                           warnings => policy_warnings(Policy)}};
+        {ok, _} ->
+            case read_readmes(ProjectRoot, Options) of
                 {error, _} = Error ->
-                    Error
+                    Error;
+                {ok, Files} ->
+                    Expected = expected(Repo, FormalTags, Policy),
+                    Results = [{File, check_file(File, Expected)} ||
+                               File <- Files],
+                    case check_results(Results, Policy) of
+                        ok ->
+                            {ok, #{status => checked,
+                                   warnings => policy_warnings(Policy)}};
+                        {error, _} = Error ->
+                            Error
+                    end
             end
     end;
 run_readme_mode(ProjectRoot, write, Repo, FormalTags, Policy, Options) ->
@@ -143,7 +169,8 @@ run_readme_mode(ProjectRoot, write, Repo, FormalTags, Policy, Options) ->
             Expected = expected(Repo, FormalTags, Policy),
             Transformed = [{File, transform_file(File, Expected)} ||
                            File <- Files],
-            case write_files(Transformed, Options) of
+            WorkflowChanges = maps:get(workflow_changes, Options, []),
+            case write_files(WorkflowChanges, Transformed, Options) of
                 ok ->
                     {ok, #{status => written,
                            warnings => policy_warnings(Policy)}};
@@ -160,7 +187,7 @@ read_workflow(Path, Options) ->
             absent;
         {ok, #file_info{type = regular}} ->
             case fs_call(read_file, [Path], Options) of
-                {ok, Content} when is_binary(Content) -> present;
+                {ok, Content} when is_binary(Content) -> {present, Content};
                 {ok, _Other} ->
                     {error, {workflow_invalid, Path, non_binary_data}};
                 {error, Reason} ->
@@ -171,6 +198,180 @@ read_workflow(Path, Options) ->
         {error, Reason} ->
             {error, {workflow_read, Path, Reason}}
     end.
+
+release_workflow(_ProjectRoot, _Mode, #{release := none}, _Options) ->
+    {ok, []};
+release_workflow(_ProjectRoot, _Mode, #{release := equivalent}, _Options) ->
+    {ok, []};
+release_workflow(ProjectRoot, check, #{release := {tag, Tag}}, Options) ->
+    Path = release_workflow_path(ProjectRoot),
+    case read_workflow(Path, Options) of
+        {present, Content} ->
+            case workflow_name(Content) of
+                {ok, "release-" ++ Tag} -> {ok, []};
+                {ok, Name} ->
+                    {error, {workflow_invalid, Path,
+                             {name_mismatch, "release-" ++ Tag, Name}}};
+                {error, Reason} ->
+                    {error, {workflow_invalid, Path, Reason}}
+            end;
+        absent ->
+            {error, {workflow_invalid, Path, missing}};
+        {error, _} = Error ->
+            Error
+    end;
+release_workflow(ProjectRoot, write, #{release := {tag, Tag}}, Options) ->
+    Path = release_workflow_path(ProjectRoot),
+    case read_workflow(Path, Options) of
+        {present, Content} ->
+            case replace_workflow_name(Content, "release-" ++ Tag) of
+                {ok, NewContent} ->
+                    {ok, [{workflow, Path, Content, NewContent}]};
+                {error, Reason} ->
+                    {error, {workflow_invalid, Path, Reason}}
+            end;
+        absent ->
+            {error, {workflow_invalid, Path, missing}};
+        {error, _} = Error ->
+            Error
+    end.
+
+release_workflow_path(ProjectRoot) ->
+    filename:join(ProjectRoot, ".github/workflows/release.yml").
+
+workflow_name(Content) ->
+    case workflow_name_info(Content) of
+        {ok, #{value := Value}} -> {ok, Value};
+        {error, _} = Error -> Error
+    end.
+
+replace_workflow_name(Content, NewName) ->
+    case workflow_name_info(Content) of
+        {ok, #{index := Index, prefix := Prefix, suffix := Suffix,
+               style := Style}} ->
+            Lines = split_lines(Content),
+            {Before, [{_Body, Eol} | After]} =
+                lists:split(Index, Lines),
+            NewValue = render_workflow_name(NewName, Style),
+            NewLine = {list_to_binary(Prefix ++ NewValue ++ Suffix), Eol},
+            {ok, iolist_to_binary(render_lines(Before ++
+                                                [NewLine | After]))};
+        {error, _} = Error ->
+            Error
+    end.
+
+workflow_name_info(Content) when is_binary(Content) ->
+    workflow_name_info(split_lines(Content), 0, []).
+
+workflow_name_info([], _Index, []) ->
+    {error, missing_top_level_name};
+workflow_name_info([], _Index, [Info]) ->
+    {ok, Info};
+workflow_name_info([], _Index, _Infos) ->
+    {error, duplicate_top_level_name};
+workflow_name_info([{Body, _Eol} | Rest], Index, Infos) ->
+    case parse_workflow_name_line(binary_to_list(Body)) of
+        ignore ->
+            workflow_name_info(Rest, Index + 1, Infos);
+        {ok, Value, Prefix, Suffix, Style} ->
+            workflow_name_info(Rest, Index + 1,
+                               [#{index => Index, value => Value,
+                                  prefix => Prefix, suffix => Suffix,
+                                  style => Style} | Infos]);
+        {error, _} = Error ->
+            Error
+    end.
+
+parse_workflow_name_line([]) ->
+    ignore;
+parse_workflow_name_line([First | _]) when First =:= $ ;
+                                                    First =:= $\t ->
+    ignore;
+parse_workflow_name_line([$# | _]) ->
+    ignore;
+parse_workflow_name_line(Line) ->
+    case lists:prefix("name:", Line) of
+        false -> ignore;
+        true ->
+            Rest = lists:nthtail(5, Line),
+            Leading = leading_spaces(Rest),
+            ValueAndComment = lists:nthtail(length(Leading), Rest),
+            {Value0, Comment} = split_inline_comment(ValueAndComment),
+            Value1 = string:trim(Value0, both, " \t"),
+            Trailing = trailing_spaces(Value0),
+            case scalar_workflow_name(Value1) of
+                {ok, Value, Style} ->
+                    {ok, Value, "name:" ++ Leading,
+                     Trailing ++ Comment, Style};
+                {error, _} = Error ->
+                    Error
+            end
+    end.
+
+leading_spaces([C | Rest]) when C =:= $ ; C =:= $\t ->
+    [C | leading_spaces(Rest)];
+leading_spaces(_Text) ->
+    [].
+
+trailing_spaces(Text) ->
+    lists:reverse(leading_spaces(lists:reverse(Text))).
+
+split_inline_comment(Text) ->
+    split_inline_comment(Text, none, []).
+
+split_inline_comment([], _Quote, Acc) ->
+    {lists:reverse(Acc), []};
+split_inline_comment([C | Rest], none, Acc) when C =:= $#, Acc =:= [] ->
+    {[], [C | Rest]};
+split_inline_comment([C | Rest], none, Acc) when C =:= $#, Rest =/= [] ->
+    case Acc of
+        [Previous | _] when Previous =:= $ ; Previous =:= $\t ->
+            {lists:reverse(Acc), [C | Rest]};
+        _ ->
+            split_inline_comment(Rest, none, [C | Acc])
+    end;
+split_inline_comment([$' | Rest], none, Acc) ->
+    split_inline_comment(Rest, single, [$' | Acc]);
+split_inline_comment([$" | Rest], none, Acc) ->
+    split_inline_comment(Rest, double, [$" | Acc]);
+split_inline_comment([$' | Rest], single, Acc) ->
+    split_inline_comment(Rest, none, [$' | Acc]);
+split_inline_comment([$" | Rest], double, Acc) ->
+    split_inline_comment(Rest, none, [$" | Acc]);
+split_inline_comment([C | Rest], Quote, Acc) ->
+    split_inline_comment(Rest, Quote, [C | Acc]).
+
+scalar_workflow_name([]) ->
+    {error, missing_top_level_name_value};
+scalar_workflow_name([$| | _]) ->
+    {error, non_scalar_top_level_name};
+scalar_workflow_name([$> | _]) ->
+    {error, non_scalar_top_level_name};
+scalar_workflow_name([$[ | _]) ->
+    {error, non_scalar_top_level_name};
+scalar_workflow_name([${ | _]) ->
+    {error, non_scalar_top_level_name};
+scalar_workflow_name([$' | Rest]) ->
+    quoted_workflow_name(Rest, $', single);
+scalar_workflow_name([$" | Rest]) ->
+    quoted_workflow_name(Rest, $", double);
+scalar_workflow_name(Value) ->
+    {ok, Value, plain}.
+
+quoted_workflow_name(Rest, Quote, Style) ->
+    case lists:reverse(Rest) of
+        [Quote | RevValue] ->
+            case RevValue of
+                [] -> {error, missing_top_level_name_value};
+                _ -> {ok, lists:reverse(RevValue), Style}
+            end;
+        _ ->
+            {error, invalid_top_level_name}
+    end.
+
+render_workflow_name(Name, plain) -> Name;
+render_workflow_name(Name, single) -> [$' | Name] ++ [$'];
+render_workflow_name(Name, double) -> [$" | Name] ++ [$"].
 
 git_facts(ProjectRoot, Options) ->
     case git_call(ProjectRoot, ["rev-parse", "--verify", "HEAD"], Options) of
@@ -308,18 +509,14 @@ equivalent_tags_list(FormalTags) ->
 master_badge(Repo) ->
     Base = "https://github.com/" ++ Repo ++
            "/actions/workflows/ci.yml",
-    "**master CI** [![CI](" ++ Base ++
+    "[![CI](" ++ Base ++
     "/badge.svg?branch=master&event=push)](" ++ Base ++
     "?query=branch%3Amaster)".
 
 release_badge(Repo, Tag) ->
     Base = "https://github.com/" ++ Repo ++
-           "/actions/workflows/ci.yml",
-    Label = case Tag of
-                [$v | Rest] -> Rest;
-                _ -> Tag
-            end,
-    "**" ++ Label ++ " release CI** [![CI](" ++ Base ++
+           "/actions/workflows/release.yml",
+    "[![CI](" ++ Base ++
     "/badge.svg?branch=" ++ Tag ++ "&event=push)](" ++ Base ++
     "?query=branch%3A" ++ Tag ++ ")".
 
@@ -559,20 +756,42 @@ canonical_block(Expected, InternalEol, BoundaryEol, AddTrailingBlank) ->
             end,
     iolist_to_binary(render_lines(Core1)).
 
-write_files([], _Options) ->
+write_files(WorkflowChanges, ReadmeChanges, Options) ->
+    Changes = WorkflowChanges ++
+              [{readme, maps:get(path, File), maps:get(content, File),
+                maps:get(content, Transformed)} ||
+                  {File, Transformed} <- ReadmeChanges],
+    write_changes(Changes, Options, []).
+
+write_changes([], _Options, _Written) ->
     ok;
-write_files([{File, Transformed} | Rest], Options) ->
-    case maps:get(content, File) =:= maps:get(content, Transformed) of
-        true -> write_files(Rest, Options);
-        false ->
-            Path = maps:get(path, File),
-            case atomic_write(Path, maps:get(content, Transformed), Options) of
-                {ok, _} -> write_files(Rest, Options);
-                ok -> write_files(Rest, Options);
-                {error, Reason} ->
-                    {error, {readme_write, Path, replace, Reason}}
-            end
+write_changes([{_Kind, _Path, OldContent, NewContent} | Rest], Options,
+              Written) when OldContent =:= NewContent ->
+    write_changes(Rest, Options, Written);
+write_changes([{Kind, Path, OldContent, NewContent} | Rest], Options,
+              Written) ->
+    case atomic_write(Path, NewContent, Options) of
+        {ok, _} ->
+            write_changes(Rest, Options,
+                          [{Kind, Path, OldContent} | Written]);
+        ok ->
+            write_changes(Rest, Options,
+                          [{Kind, Path, OldContent} | Written]);
+        {error, Reason} ->
+            restore_changes(Written, Options),
+            {error, {write_kind(Kind), Path, replace, Reason}}
     end.
+
+restore_changes([], _Options) ->
+    ok;
+restore_changes([{_Kind, Path, Content} | Rest], Options) ->
+    _ = atomic_write(Path, Content, Options),
+    restore_changes(Rest, Options).
+
+write_kind(workflow) ->
+    workflow_write;
+write_kind(readme) ->
+    readme_write.
 
 candidates(Lines) ->
     candidates(Lines, 0, []).
@@ -589,13 +808,38 @@ candidates([{Body, _Eol} | Rest], Index, Acc) ->
     end.
 
 candidate(Text) ->
-    case lists:prefix("**master CI** [![CI]", Text) of
+    case master_candidate(Text) of
         true -> {master, none};
         false ->
-            case lists:prefix("[![master CI]", Text) of
-                true -> {master, none};
-                false -> release_candidate(Text)
+            case release_workflow_candidate(Text) of
+                {ok, Tag} -> {release, Tag};
+                none ->
+                    case lists:prefix("**master CI** [![CI]", Text) of
+                        true -> {master, none};
+                        false ->
+                            case lists:prefix("[![master CI]", Text) of
+                                true -> {master, none};
+                                false -> release_candidate(Text)
+                            end
+                    end
             end
+    end.
+
+master_candidate(Text) ->
+    string:find(Text,
+                "/actions/workflows/ci.yml/badge.svg?branch=master&event=push)](")
+        =/= nomatch.
+
+release_workflow_candidate(Text) ->
+    Marker = "/actions/workflows/release.yml/badge.svg?branch=",
+    case string:split(Text, Marker, leading) of
+        [_Prefix, Tail] ->
+            case string:split(Tail, "&event=push)](", leading) of
+                [Tag, _Rest] when Tag =/= [] -> {ok, Tag};
+                _ -> none
+            end;
+        _ ->
+            none
     end.
 
 release_candidate("**" ++ Rest) ->

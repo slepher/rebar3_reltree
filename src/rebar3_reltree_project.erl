@@ -216,18 +216,14 @@ expected_badges(Repo, #{tag := Tag}) ->
 master_badge(Repo) ->
     Base = "https://github.com/" ++ Repo ++
            "/actions/workflows/ci.yml",
-    "**master CI** [![CI](" ++ Base ++
+    "[![CI](" ++ Base ++
     "/badge.svg?branch=master&event=push)](" ++ Base ++
     "?query=branch%3Amaster)".
 
 release_badge(Repo, Tag) ->
     Base = "https://github.com/" ++ Repo ++
-           "/actions/workflows/ci.yml",
-    Label = case Tag of
-                [$v | Rest] -> Rest;
-                _ -> Tag
-            end,
-    "**" ++ Label ++ " release CI** [![CI](" ++ Base ++
+           "/actions/workflows/release.yml",
+    "[![CI](" ++ Base ++
     "/badge.svg?branch=" ++ Tag ++ "&event=push)](" ++ Base ++
     "?query=branch%3A" ++ Tag ++ ")".
 
