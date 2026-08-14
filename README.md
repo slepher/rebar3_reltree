@@ -1,6 +1,6 @@
 [![CI](https://github.com/slepher/rebar3_reltree/actions/workflows/ci.yml/badge.svg?branch=master&event=push)](https://github.com/slepher/rebar3_reltree/actions/workflows/ci.yml?query=branch%3Amaster)
 
-[![CI](https://github.com/slepher/rebar3_reltree/actions/workflows/release.yml/badge.svg?branch=0.2.0&event=push)](https://github.com/slepher/rebar3_reltree/actions/workflows/release.yml?query=branch%3A0.2.0)
+[![CI](https://github.com/slepher/rebar3_reltree/actions/workflows/release.yml/badge.svg?branch=0.2.1&event=push)](https://github.com/slepher/rebar3_reltree/actions/workflows/release.yml?query=branch%3A0.2.1)
 
 # rebar3_reltree
 
@@ -26,7 +26,7 @@ Add the plugin to the target project's `rebar.config`:
 
 ```erlang
 {project_plugins, [
-    {rebar3_reltree, {git, "https://github.com/slepher/rebar3_reltree.git", {tag, "0.2.0"}}}
+    {rebar3_reltree, {git, "https://github.com/slepher/rebar3_reltree.git", {tag, "0.2.1"}}}
 ]}.
 ```
 
@@ -38,7 +38,7 @@ _checkouts/rebar3_reltree -> /path/to/rebar3_reltree
 
 The plugin and the Codex skill are independent: plugin commands do not require the skill to be installed.
 
-## Release 0.2.0
+## Release 0.2.1
 
 This is a compatibility maintenance release. It has no migration requirements and no fixed
 runtime dependencies beyond the Erlang/OTP `kernel` and `stdlib` applications.
