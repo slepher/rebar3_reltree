@@ -41,7 +41,7 @@ script_is_executable_and_help_is_bare_installer(_Config) ->
             ?assert(
                 string:str(
                     Text,
-                    "Usage: scripts/install_reltree [--dest DIR] [--force]"
+                    "Usage: scripts/install_reltree.escript [--dest DIR] [--force]"
                 ) > 0
             ),
             ?assert(string:str(Text, "--dest DIR") > 0),
@@ -335,7 +335,7 @@ runtime_path() ->
     filename:join([code:root_dir(), "bin"]) ++ ":/usr/bin:/bin".
 
 script_path() ->
-    filename:join([project_root(), "scripts", "install_reltree"]).
+    filename:join([project_root(), "scripts", "install_reltree.escript"]).
 
 project_root() ->
     AppDir = code:lib_dir(rebar3_reltree),
@@ -358,7 +358,7 @@ source_path() ->
     ]).
 
 make_repository_fixture(Root) ->
-    Script = filename:join([Root, "scripts", "install_reltree"]),
+    Script = filename:join([Root, "scripts", "install_reltree.escript"]),
     Source = filename:join([Root, "priv", "skills", "reltree"]),
     ok = filelib:ensure_dir(Script),
     ok = filelib:ensure_dir(filename:join([Source, "agents", "placeholder"])),

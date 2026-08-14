@@ -122,7 +122,7 @@ master workflow 使用 `master`，release workflow 使用 `release-<tag>`。
 在本仓库中直接执行 escript，无需先运行 `rebar3 escriptize`：
 
 ```bash
-scripts/install_reltree
+scripts/install_reltree.escript
 ```
 
 默认目标为：
@@ -134,8 +134,8 @@ $HOME/.agents/skills/reltree
 可选参数：
 
 ```bash
-scripts/install_reltree --dest /path/to/skills
-scripts/install_reltree --force
+scripts/install_reltree.escript --dest /path/to/skills
+scripts/install_reltree.escript --force
 ```
 
 `--dest DIR` 安装到 `DIR/reltree`。目标已存在时默认失败；`--force` 执行完整的安全替换。安装器只复制 `SKILL.md` 和 `agents/openai.yaml`，不执行网络、Git、tag、push 或发布操作。

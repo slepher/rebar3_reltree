@@ -46,7 +46,7 @@ parse(["--dest", [] | _Rest], _Options) ->
 parse([Option | _Rest], _Options) when hd(Option) =:= $- ->
     {error, ["unknown option ", io_lib:format("~p", [Option])]};
 parse([Argument | _Rest], _Options) ->
-    {error, ["unexpected argument ", io_lib:format("~p", [Argument])] }.
+    {error, ["unexpected argument ", io_lib:format("~p", [Argument])]}.
 
 install(Options) ->
     Root = repository_root(),
@@ -68,20 +68,23 @@ repository_root() ->
     filename:dirname(filename:dirname(Script)).
 
 help() ->
-    ["Usage: scripts/install_reltree [--dest DIR] [--force]\n\n",
-     "Install the repository's packaged reltree skill.\n\n",
-     "Options:\n",
-     "  --dest DIR  install below DIR/reltree\n",
-     "  --force     replace an existing reltree skill\n"].
+    [
+        "Usage: scripts/install_reltree.escript [--dest DIR] [--force]\n\n",
+        "Install the repository's packaged reltree skill.\n\n",
+        "Options:\n",
+        "  --dest DIR  install below DIR/reltree\n",
+        "  --force     replace an existing reltree skill\n"
+    ].
 
 fail(Status, Reason) ->
-    io:put_chars(standard_error, ["install_reltree: ", Reason, "\n"]),
+    io:put_chars(standard_error, ["install_reltree.escript: ", Reason, "\n"]),
     halt(Status).
 
 -spec resolve_destination(map(), fun((string()) -> term())) ->
     {ok, string()} | {error, term()}.
-resolve_destination(Options, EnvFun)
-  when is_map(Options), is_function(EnvFun, 1) ->
+resolve_destination(Options, EnvFun) when
+    is_map(Options), is_function(EnvFun, 1)
+->
     case maps:find(dest, Options) of
         {ok, Dest} when is_list(Dest), Dest =/= [] ->
             {ok, filename:absname(Dest)};
@@ -90,17 +93,24 @@ resolve_destination(Options, EnvFun)
         error ->
             case environment_value("HOME", EnvFun) of
                 {ok, Home} ->
-                    {ok, filename:absname(filename:join(
-                                               [Home, ".agents", "skills"]))};
-                absent -> {error, unavailable};
-                {error, Reason} -> {error, Reason}
+                    {ok,
+                        filename:absname(
+                            filename:join(
+                                [Home, ".agents", "skills"]
+                            )
+                        )};
+                absent ->
+                    {error, unavailable};
+                {error, Reason} ->
+                    {error, Reason}
             end
     end.
 
 -spec install(string(), string(), boolean()) ->
     {ok, string()} | {error, term()}.
-install(Source0, Parent0, Force)
-  when is_boolean(Force) ->
+install(Source0, Parent0, Force) when
+    is_boolean(Force)
+->
     case absolute_path(Source0, source) of
         {ok, Source} ->
             case absolute_path(Parent0, parent) of
@@ -113,7 +123,6 @@ install(Source0, Parent0, Force)
         {error, Error} ->
             Error
     end;
-
 install(_Source, _Parent, _Force) ->
     install_error(parent, ".", invalid_arguments).
 
@@ -124,25 +133,42 @@ install_paths(Source, Parent, Target, Force) ->
                 ok ->
                     case paths_overlap(Source, Parent, Target) of
                         {ok, false} ->
-                            case filelib:ensure_dir(
-                                   filename:join(Parent, ".reltree-parent")) of
+                            case
+                                filelib:ensure_dir(
+                                    filename:join(Parent, ".reltree-parent")
+                                )
+                            of
                                 ok ->
                                     case preflight_target(Target, Force) of
-                                        ok -> stage(Parent, Target, Force,
-                                                    Files);
+                                        ok ->
+                                            stage(
+                                                Parent,
+                                                Target,
+                                                Force,
+                                                Files
+                                            );
                                         {error, {target_conflict, Reason}} ->
-                                            install_error(target_conflict,
-                                                          Target, Reason);
+                                            install_error(
+                                                target_conflict,
+                                                Target,
+                                                Reason
+                                            );
                                         {error, {target, Reason}} ->
-                                            install_error(target, Target,
-                                                          Reason)
+                                            install_error(
+                                                target,
+                                                Target,
+                                                Reason
+                                            )
                                     end;
                                 {error, Reason} ->
                                     install_error(parent, Parent, Reason)
                             end;
                         {ok, true} ->
-                            install_error(source_validation, Source,
-                                          {source_target_overlap, Target});
+                            install_error(
+                                source_validation,
+                                Source,
+                                {source_target_overlap, Target}
+                            );
                         {error, Reason} ->
                             install_error(source_validation, Source, Reason)
                     end;
@@ -178,47 +204,63 @@ stage(Parent, Target, Force, Files) ->
     {SkillBytes, AgentBytes} = Files,
     case create_owned_directory(Parent, ?STAGE_PREFIX, 0) of
         {ok, Stage} ->
-            case copy_stage_files(filename:join(Stage, "agents"), Stage,
-                                  SkillBytes, AgentBytes) of
+            case
+                copy_stage_files(
+                    filename:join(Stage, "agents"),
+                    Stage,
+                    SkillBytes,
+                    AgentBytes
+                )
+            of
                 ok ->
                     case validate_stage(Stage, Files) of
-                        ok -> activate(Stage, Parent, Target, Force);
+                        ok ->
+                            activate(Stage, Parent, Target, Force);
                         {error, Reason} ->
                             cleanup_after_error(
-                              Stage,
-                              install_error(stage_validate, Stage, Reason))
+                                Stage,
+                                install_error(stage_validate, Stage, Reason)
+                            )
                     end;
                 {error, Reason} ->
                     cleanup_after_error(
-                      Stage, install_error(stage_copy, Stage, Reason))
+                        Stage, install_error(stage_copy, Stage, Reason)
+                    )
             end;
         {error, Reason} ->
             install_error(stage_create, Parent, Reason)
     end.
 
-create_owned_directory(_Parent, _Prefix, Attempts)
-  when Attempts >= ?MAX_NAME_ATTEMPTS ->
+create_owned_directory(_Parent, _Prefix, Attempts) when
+    Attempts >= ?MAX_NAME_ATTEMPTS
+->
     {error, name_allocation_exhausted};
 create_owned_directory(Parent, Prefix, Attempts) ->
     Path = sibling_path(Parent, Prefix),
     case file:make_dir(Path) of
         ok -> {ok, Path};
-        {error, eexist} ->
-            create_owned_directory(Parent, Prefix, Attempts + 1);
-        {error, Reason} ->
-            {error, {Path, Reason}}
+        {error, eexist} -> create_owned_directory(Parent, Prefix, Attempts + 1);
+        {error, Reason} -> {error, {Path, Reason}}
     end.
 
 copy_stage_files(Agents, Stage, SkillBytes, AgentBytes) ->
     case file:make_dir(Agents) of
         ok ->
-            case copy_leaf(SkillBytes, filename:join(Stage, "SKILL.md"),
-                           skill) of
+            case
+                copy_leaf(
+                    SkillBytes,
+                    filename:join(Stage, "SKILL.md"),
+                    skill
+                )
+            of
                 ok ->
-                    copy_leaf(AgentBytes,
-                              filename:join(Agents, "openai.yaml"),
-                              agent);
-                {error, _} = Error -> Error
+                    copy_leaf(
+                        AgentBytes,
+                        filename:join(Agents, "openai.yaml"),
+                        agent
+                    );
+                {error, _} = Error ->
+                    Error
             end;
         {error, Reason} ->
             {error, {agents, Reason}}
@@ -235,11 +277,16 @@ copy_leaf(Bytes, Path, Name) ->
 validate_stage(Stage, Files) ->
     case validate_directory(Stage, ["SKILL.md", "agents"]) of
         ok ->
-            case validate_directory(filename:join(Stage, "agents"),
-                                    ["openai.yaml"]) of
+            case
+                validate_directory(
+                    filename:join(Stage, "agents"),
+                    ["openai.yaml"]
+                )
+            of
                 ok ->
                     validate_stage_files(Stage, Files);
-                {error, _Path, Reason} -> {error, Reason}
+                {error, _Path, Reason} ->
+                    {error, Reason}
             end;
         {error, _Path, Reason} ->
             {error, Reason}
@@ -263,27 +310,33 @@ activate(Stage, _Parent, Target, false) ->
     case target_state(Target) of
         absent ->
             case file:rename(Stage, Target) of
-                ok -> {ok, Target};
+                ok ->
+                    {ok, Target};
                 {error, Reason} ->
                     cleanup_after_error(
-                      Stage, install_error(replace, Target, Reason))
+                        Stage, install_error(replace, Target, Reason)
+                    )
             end;
         {exists, Type} ->
             cleanup_after_error(
-              Stage,
-              install_error(target_conflict, Target, {exists, Type}));
+                Stage,
+                install_error(target_conflict, Target, {exists, Type})
+            );
         {error, Reason} ->
             cleanup_after_error(
-              Stage, install_error(target, Target, Reason))
+                Stage, install_error(target, Target, Reason)
+            )
     end;
 activate(Stage, Parent, Target, true) ->
     case target_state(Target) of
         absent ->
             case file:rename(Stage, Target) of
-                ok -> {ok, Target};
+                ok ->
+                    {ok, Target};
                 {error, Reason} ->
                     cleanup_after_error(
-                      Stage, install_error(replace, Target, Reason))
+                        Stage, install_error(replace, Target, Reason)
+                    )
             end;
         {exists, _Type} ->
             case rename_backup(Target, Parent) of
@@ -291,21 +344,27 @@ activate(Stage, Parent, Target, true) ->
                     case file:rename(Stage, Target) of
                         ok ->
                             case remove_owned(ActualBackup) of
-                                ok -> {ok, Target};
+                                ok ->
+                                    {ok, Target};
                                 {error, Reason} ->
-                                    install_error(cleanup, ActualBackup,
-                                                  Reason)
+                                    install_error(
+                                        cleanup,
+                                        ActualBackup,
+                                        Reason
+                                    )
                             end;
                         {error, ReplaceReason} ->
                             rollback(Stage, Target, ActualBackup, ReplaceReason)
                     end;
                 {error, Reason} ->
                     cleanup_after_error(
-                      Stage, install_error(backup, Target, Reason))
+                        Stage, install_error(backup, Target, Reason)
+                    )
             end;
         {error, Reason} ->
             cleanup_after_error(
-              Stage, install_error(target, Target, Reason))
+                Stage, install_error(target, Target, Reason)
+            )
     end.
 
 target_state(Target) ->
@@ -318,8 +377,9 @@ target_state(Target) ->
 rename_backup(Target, Parent) ->
     rename_backup(Target, Parent, 0).
 
-rename_backup(_Target, _Parent, Attempts)
-  when Attempts >= ?MAX_NAME_ATTEMPTS ->
+rename_backup(_Target, _Parent, Attempts) when
+    Attempts >= ?MAX_NAME_ATTEMPTS
+->
     {error, name_allocation_exhausted};
 rename_backup(Target, Parent, Attempts) ->
     Backup = sibling_path(Parent, ?BACKUP_PREFIX),
@@ -327,10 +387,8 @@ rename_backup(Target, Parent, Attempts) ->
         {error, enoent} ->
             case file:rename(Target, Backup) of
                 ok -> {ok, Backup};
-                {error, eexist} ->
-                    rename_backup(Target, Parent, Attempts + 1);
-                {error, Reason} ->
-                    {error, Reason}
+                {error, eexist} -> rename_backup(Target, Parent, Attempts + 1);
+                {error, Reason} -> {error, Reason}
             end;
         {ok, _Info} ->
             rename_backup(Target, Parent, Attempts + 1);
@@ -342,29 +400,36 @@ rollback(Stage, Target, Backup, ReplaceReason) ->
     case file:rename(Backup, Target) of
         ok ->
             case remove_owned(Stage) of
-                ok -> install_error(replace, Target, ReplaceReason);
+                ok ->
+                    install_error(replace, Target, ReplaceReason);
                 {error, CleanupReason} ->
-                    install_error(rollback, Stage,
-                                  {replace, ReplaceReason,
-                                   {stage_cleanup, CleanupReason}})
+                    install_error(
+                        rollback,
+                        Stage,
+                        {replace, ReplaceReason, {stage_cleanup, CleanupReason}}
+                    )
             end;
         {error, RollbackReason} ->
             case remove_owned(Stage) of
                 ok ->
-                    install_error(rollback, Backup,
-                                  {replace, ReplaceReason, RollbackReason});
+                    install_error(
+                        rollback,
+                        Backup,
+                        {replace, ReplaceReason, RollbackReason}
+                    );
                 {error, CleanupReason} ->
-                    install_error(rollback, Backup,
-                                  {replace, ReplaceReason, RollbackReason,
-                                   {stage_cleanup, CleanupReason}})
+                    install_error(
+                        rollback,
+                        Backup,
+                        {replace, ReplaceReason, RollbackReason, {stage_cleanup, CleanupReason}}
+                    )
             end
     end.
 
 cleanup_after_error(Path, Original) ->
     case remove_owned(Path) of
         ok -> Original;
-        {error, Reason} ->
-            install_error(cleanup, Path, {original, Original, Reason})
+        {error, Reason} -> install_error(cleanup, Path, {original, Original, Reason})
     end.
 
 remove_owned(Path) ->
@@ -403,20 +468,27 @@ validate_source(Source) ->
                 ok ->
                     case read_regular(filename:join(Source, "SKILL.md")) of
                         {ok, SkillBytes} ->
-                            case read_regular(filename:join(
-                                                       [Agents, "openai.yaml"])) of
+                            case
+                                read_regular(
+                                    filename:join(
+                                        [Agents, "openai.yaml"]
+                                    )
+                                )
+                            of
                                 {ok, AgentBytes} ->
                                     {ok, {SkillBytes, AgentBytes}};
                                 {error, Reason} ->
-                                    {error, filename:join(
-                                              [Agents, "openai.yaml"]),
-                                     Reason}
+                                    {error,
+                                        filename:join(
+                                            [Agents, "openai.yaml"]
+                                        ),
+                                        Reason}
                             end;
                         {error, Reason} ->
-                            {error, filename:join(Source, "SKILL.md"),
-                             Reason}
+                            {error, filename:join(Source, "SKILL.md"), Reason}
                     end;
-                {error, Path, Reason} -> {error, Path, Reason}
+                {error, Path, Reason} ->
+                    {error, Path, Reason}
             end;
         {error, Path, Reason} ->
             {error, Path, Reason}
@@ -431,7 +503,8 @@ validate_directory(Path, ExpectedNames) ->
                         ExpectedNames -> ok;
                         Actual -> {error, Path, {entries, ExpectedNames, Actual}}
                     end;
-                {error, Reason} -> {error, Path, Reason}
+                {error, Reason} ->
+                    {error, Path, Reason}
             end;
         {ok, #file_info{type = Type}} ->
             {error, Path, {not_directory, Type}};
@@ -450,20 +523,27 @@ read_regular(Path) ->
     end.
 
 paths_overlap(Source, Parent, Target) ->
-    case {canonical_location(Source), canonical_location(Parent),
-          canonical_location(Target)} of
+    case {canonical_location(Source), canonical_location(Parent), canonical_location(Target)} of
         {{ok, CanonicalSource}, {ok, CanonicalParent}, {ok, CanonicalTarget}} ->
-            {ok, locations_overlap(CanonicalSource, CanonicalParent,
-                                   CanonicalTarget)};
+            {ok,
+                locations_overlap(
+                    CanonicalSource,
+                    CanonicalParent,
+                    CanonicalTarget
+                )};
         {SourceResult, ParentResult, TargetResult} ->
-            {error, {canonical_path_failed,
-                     canonical_path_reason(SourceResult, ParentResult,
-                                            TargetResult)}}
+            {error,
+                {canonical_path_failed,
+                    canonical_path_reason(
+                        SourceResult,
+                        ParentResult,
+                        TargetResult
+                    )}}
     end.
 
 locations_overlap(Source, Parent, Target) ->
     path_prefix(Source, Parent) orelse path_prefix(Parent, Source) orelse
-    path_prefix(Source, Target) orelse path_prefix(Target, Source).
+        path_prefix(Source, Target) orelse path_prefix(Target, Source).
 
 canonical_path_reason({error, Reason}, _ParentResult, _TargetResult) ->
     {source, Reason};
@@ -495,16 +575,25 @@ canonical_components([Component | Rest], Current, Hops) ->
         {ok, #file_info{type = symlink}} ->
             case file:read_link(Candidate) of
                 {ok, Link} ->
-                    LinkPath = case filename:pathtype(Link) of
-                                   absolute -> Link;
-                                   relative -> filename:join(Current, Link)
-                               end,
+                    LinkPath =
+                        case filename:pathtype(Link) of
+                            absolute -> Link;
+                            relative -> filename:join(Current, Link)
+                        end,
                     LinkComponents = normalized_components(
-                                       filename:split(filename:absname(
-                                                       LinkPath))),
-                    canonical_components(LinkComponents ++ Rest, "",
-                                         Hops + 1);
-                {error, Reason} -> {error, {Candidate, Reason}}
+                        filename:split(
+                            filename:absname(
+                                LinkPath
+                            )
+                        )
+                    ),
+                    canonical_components(
+                        LinkComponents ++ Rest,
+                        "",
+                        Hops + 1
+                    );
+                {error, Reason} ->
+                    {error, {Candidate, Reason}}
             end;
         {ok, #file_info{type = Type}} when Rest =/= [], Type =/= directory ->
             {error, {not_directory, Candidate, Type}};
@@ -523,17 +612,25 @@ normalize_components([], Acc) -> lists:reverse(Acc);
 normalize_components(["." | Rest], Acc) -> normalize_components(Rest, Acc);
 normalize_components([".." | Rest], [_ | Acc]) -> normalize_components(Rest, Acc);
 normalize_components([".." | Rest], []) -> normalize_components(Rest, []);
-normalize_components([Component | Rest], Acc) ->
-    normalize_components(Rest, [Component | Acc]).
+normalize_components([Component | Rest], Acc) -> normalize_components(Rest, [Component | Acc]).
 
 append_components(Current, Components) ->
-    lists:foldl(fun(Component, Acc) -> filename:join(Acc, Component) end,
-                Current, Components).
+    lists:foldl(
+        fun(Component, Acc) -> filename:join(Acc, Component) end,
+        Current,
+        Components
+    ).
 
 absolute_path(Path, _Kind) when is_list(Path), Path =/= [] ->
-    try {ok, filename:absname(Path)}
-    catch Class:Reason -> install_error(parent, Path,
-                                        {invalid_path, Class, Reason})
+    try
+        {ok, filename:absname(Path)}
+    catch
+        Class:Reason ->
+            install_error(
+                parent,
+                Path,
+                {invalid_path, Class, Reason}
+            )
     end;
 absolute_path(Path, Kind) ->
     install_error(Kind, ".", {invalid_path, Path}).

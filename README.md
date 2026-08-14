@@ -123,7 +123,7 @@ When `.github/workflows/ci.yml` is absent, the command emits a warning and does 
 From this repository, run the executable escript directly:
 
 ```bash
-scripts/install_reltree
+scripts/install_reltree.escript
 ```
 
 The default target is:
@@ -135,8 +135,8 @@ $HOME/.agents/skills/reltree
 Optional controls:
 
 ```bash
-scripts/install_reltree --dest /path/to/skills
-scripts/install_reltree --force
+scripts/install_reltree.escript --dest /path/to/skills
+scripts/install_reltree.escript --force
 ```
 
 `--dest DIR` installs to `DIR/reltree`. Existing targets fail by default; `--force` performs a complete safe replacement. The installer copies exactly `SKILL.md` and `agents/openai.yaml` and performs no network, Git, tag, push, or publication operation.

@@ -125,7 +125,7 @@ skill 只包含自身工作流和 agent metadata，不打包发布规范副本�
 通过仓库内的安装 escript 安装到用户级 Codex skills 目录，无需先运行 `rebar3 escriptize`：
 
 ```bash
-scripts/install_reltree
+scripts/install_reltree.escript
 ```
 
 安装规则：

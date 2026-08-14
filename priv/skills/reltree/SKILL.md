@@ -9,7 +9,7 @@ Use the target repository's current local facts and explicit user instructions. 
 
 ## Install and boundaries
 
-For a first install from this repository, run `scripts/install_reltree` with no arguments. It is a
+For a first install from this repository, run `scripts/install_reltree.escript` with no arguments. It is a
 directly executable escript and does not require `rebar3 escriptize`. `--dest DIR` is an optional
 explicit skills parent; the target is `DIR/reltree`. `--force` is an optional explicit replacement
 of an existing target. Without `--dest`, the target is
