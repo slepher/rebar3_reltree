@@ -27,9 +27,9 @@ agents/openai.yaml
 There is no packaged README, template, script, or other policy resource. The
 installer escript only installs this packaged skill and performs local file operations: no network,
 Git, tag, push, or artifact publication. Its entry point has no provider-command subcommands.
-The Rebar3 plugin independently provides `rebar3 reltree tree`, `rebar3 reltree checkvsn`, and
-`rebar3 reltree bgate --check|--write`; those commands are not escript commands and do not require
-that this skill already be installed.
+The Rebar3 plugin independently provides `rebar3 reltree tree`, `rebar3 reltree checkvsn`,
+`rebar3 reltree bgate --check|--write`, and `rebar3 reltree fmt --check`; those commands are not
+escript commands and do not require that this skill already be installed.
 
 ## Source of truth
 
@@ -50,7 +50,10 @@ asks, with the `app.src` base and a locally incremented same-kind suffix.
    the release CI badge before tagging, run `rebar3 reltree bgate --write --tag` (the badge tag
    is the `app.src` version); plain `--write` maintains only the master badge. Without `ci.yml`,
    do not invent a badge.
-4. Create the release commit and a local annotated tag. Run `rebar3 reltree checkvsn`,
+4. Create the release commit. Before creating the local annotated tag, run
+   `rebar3 reltree fmt --check`; if it fails, format the listed files with
+   `rebar3 fmt -w <file>`, commit those formatting changes as a separate commit, and re-run
+   until it passes. Then create the local annotated tag. Run `rebar3 reltree checkvsn`,
    `rebar3 reltree bgate --check`, and the project's complete tests. Verify the tag, version,
    dependency, README, and artifact results agree.
 

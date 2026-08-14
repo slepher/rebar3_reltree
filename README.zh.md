@@ -6,11 +6,12 @@
 
 [English](README.md)
 
-`rebar3_reltree` 是一个本地优先的 Rebar3 插件，用于理解 Erlang 项目关系并准备一致的版本发布。它提供三个相互独立的命令：
+`rebar3_reltree` 是一个本地优先的 Rebar3 插件，用于理解 Erlang 项目关系并准备一致的版本发布。它提供四个相互独立的命令：
 
 - `tree` 根据本地可证明的运行时依赖关系生成 Markdown 报告。
 - `checkvsn` 根据本地可达 Git tag 校验 `app.src` 版本。
 - `bgate` 检查或更新项目 README 中由工具管理的 GitHub Actions badge。
+- `fmt` 在 erlfmt 默认文件集之外，额外检查 `~/.agents/AGENT.md` 要求的文件格式。
 
 仓库还提供独立的 `reltree` Codex skill 安装器。这些工具都不会 push 分支或 tag、发布制品、fetch 仓库，也不会替用户决定发布版本。
 
@@ -99,6 +100,19 @@ rebar3 reltree checkvsn
 - 新版本世代：`(X+1).0.0`
 
 跳版本会被拒绝。正式 tag 可以是 `X.Y.Z` 或 `vX.Y.Z`；`rc.N` 和 `ci.N` 预发布使用相同的 `app.src` 基础版本；`check-*` tag 会被忽略。该命令只读取本地文件和 Git 状态，不检查 README badge。
+
+## 格式检查
+
+```bash
+rebar3 reltree fmt --check
+```
+
+该命令代理 `rebar3 fmt --check`，检查 erlfmt 默认文件集以及 `~/.agents/AGENT.md` 额外要求的文件：
+
+- `.git`、`_build`、`_checkouts`、`deps` 和 `node_modules` 之外的 `*.escript`
+- `rebar.config.script`
+
+命令要求安装 erlfmt 插件（`rebar3 fmt`）。它永远不会写文件：出于安全考虑不支持 `--write`，格式化应由你显式执行 `rebar3 fmt -w <file>`。
 
 ## README badge 门禁
 

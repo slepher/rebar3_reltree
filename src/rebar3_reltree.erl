@@ -33,4 +33,16 @@ init(State) ->
         {desc, "Check local application version and tag continuity."},
         {opts, rebar3_reltree_prv_checkvsn:option_spec()}
     ]),
-    {ok, rebar_state:add_provider(State2, CheckVsnProvider)}.
+    State3 = rebar_state:add_provider(State2, CheckVsnProvider),
+    FmtProvider = providers:create([
+        {name, fmt},
+        {namespace, reltree},
+        {module, rebar3_reltree_prv_fmt},
+        {example, "rebar3 reltree fmt --check"},
+        {short_desc, "Check erlfmt style with AGENT.md file support."},
+        {desc,
+            "Proxy rebar3 fmt --check over the default set plus the files required by ~/.agents/AGENT.md."},
+        {opts, rebar3_reltree_prv_fmt:option_spec()}
+    ]),
+    State4 = rebar_state:add_provider(State3, FmtProvider),
+    {ok, State4}.

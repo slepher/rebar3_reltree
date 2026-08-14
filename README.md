@@ -6,11 +6,12 @@
 
 [中文](README.zh.md)
 
-`rebar3_reltree` is a local-first Rebar3 plugin for understanding Erlang project relationships and preparing consistent releases. It provides three independent commands:
+`rebar3_reltree` is a local-first Rebar3 plugin for understanding Erlang project relationships and preparing consistent releases. It provides four independent commands:
 
 - `tree` builds a Markdown report from locally provable runtime-dependency relationships.
 - `checkvsn` validates `app.src` versions against reachable local Git tags.
 - `bgate` checks or updates the managed GitHub Actions badges in project READMEs.
+- `fmt` checks erlfmt style over the default set plus the files required by `~/.agents/AGENT.md`.
 
 The repository also ships a standalone installer for the `reltree` Codex skill. None of these tools pushes branches or tags, publishes artifacts, fetches repositories, or decides a release version for you.
 
@@ -99,6 +100,19 @@ rebar3 reltree checkvsn
 - new generation: `(X+1).0.0`
 
 It rejects skipped versions. Formal tags may be `X.Y.Z` or `vX.Y.Z`. `rc.N` and `ci.N` prereleases use the same `app.src` base version, while `check-*` tags are ignored. The command reads only local files and Git state; it does not validate README badges.
+
+## Formatting check
+
+```bash
+rebar3 reltree fmt --check
+```
+
+This proxies `rebar3 fmt --check` over the erlfmt default set and the additional files required by `~/.agents/AGENT.md`:
+
+- `*.escript` outside `.git`, `_build`, `_checkouts`, `deps`, and `node_modules`
+- `rebar.config.script`
+
+The command requires the erlfmt plugin (`rebar3 fmt`). It never writes files: `--write` is intentionally not supported, because formatting should be an explicit action. Format with `rebar3 fmt -w <file>` yourself.
 
 ## README badge gate
 

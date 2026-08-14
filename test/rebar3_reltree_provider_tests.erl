@@ -12,6 +12,8 @@ provider_registration_test() ->
     ?assert(contains_term(Providers, rebar3_reltree_prv_bgate)),
     ?assert(contains_term(Providers, checkvsn)),
     ?assert(contains_term(Providers, rebar3_reltree_prv_checkvsn)),
+    ?assert(contains_term(Providers, fmt)),
+    ?assert(contains_term(Providers, rebar3_reltree_prv_fmt)),
     ?assertNot(contains_term(Providers, skill)).
 
 provider_root_has_no_historical_dispatch_exports_test() ->
@@ -31,6 +33,88 @@ provider_metadata_test() ->
 
 provider_checkvsn_metadata_test() ->
     ?assertEqual([], rebar3_reltree_prv_checkvsn:option_spec()).
+
+provider_fmt_metadata_test() ->
+    ?assertMatch(
+        [{check, $c, "check", undefined, _}],
+        rebar3_reltree_prv_fmt:option_spec()
+    ).
+
+provider_fmt_file_set_test() ->
+    Root = unique_root(),
+    try
+        rebar3_reltree_fixtures:write_file(
+            filename:join([Root, "src", "sample.erl"]),
+            "-module(sample).\n"
+        ),
+        rebar3_reltree_fixtures:write_file(
+            filename:join([Root, "scripts", "tool.escript"]),
+            "#!/usr/bin/env escript\n"
+        ),
+        rebar3_reltree_fixtures:write_file(
+            filename:join([Root, "rebar.config.script"]),
+            "[]."
+        ),
+        rebar3_reltree_fixtures:write_file(
+            filename:join([Root, "_build", "default", "bin", "built.escript"]),
+            "built"
+        ),
+        rebar3_reltree_fixtures:write_file(
+            filename:join([Root, "deps", "dep", "vendor.escript"]),
+            "vendor"
+        ),
+        Files = rebar3_reltree_prv_fmt:file_set(Root),
+        ?assertEqual(
+            [
+                "{src,include,test}/*.{hrl,erl,app.src}",
+                "rebar.config",
+                "rebar.config.script",
+                "scripts/tool.escript"
+            ],
+            Files
+        ),
+        ?assertNot(lists:member("_build/default/bin/built.escript", Files)),
+        ?assertNot(lists:member("deps/dep/vendor.escript", Files))
+    after
+        rebar3_reltree_fixtures:cleanup(Root)
+    end.
+
+provider_fmt_rejects_write_test() ->
+    State0 = rebar_state:new([]),
+    State1 = rebar_state:command_args(State0, ["fmt", "--write"]),
+    ?assertMatch(
+        {error, {rebar3_reltree_prv_fmt, write_unsupported}},
+        rebar3_reltree_prv_fmt:do(State1)
+    ),
+    State2 = rebar_state:command_args(State0, ["fmt", "-w"]),
+    ?assertMatch(
+        {error, {rebar3_reltree_prv_fmt, write_unsupported}},
+        rebar3_reltree_prv_fmt:do(State2)
+    ).
+
+provider_fmt_rejects_missing_mode_test() ->
+    State0 = rebar_state:new([]),
+    State1 = rebar_state:command_args(State0, ["fmt"]),
+    ?assertMatch(
+        {error, {rebar3_reltree_prv_fmt, mode_missing}},
+        rebar3_reltree_prv_fmt:do(State1)
+    ).
+
+provider_fmt_rejects_other_options_test() ->
+    State0 = rebar_state:new([]),
+    State1 = rebar_state:command_args(
+        State0,
+        ["fmt", "--print-width", "100"]
+    ),
+    ?assertMatch(
+        {error, {rebar3_reltree_prv_fmt, invalid_arguments}},
+        rebar3_reltree_prv_fmt:do(State1)
+    ).
+
+provider_fmt_help_is_successful_test() ->
+    State0 = rebar_state:new([]),
+    State1 = rebar_state:command_args(State0, ["fmt", "--help"]),
+    ?assertMatch({ok, _}, rebar3_reltree_prv_fmt:do(State1)).
 
 provider_bgate_metadata_and_request_test() ->
     ?assertMatch(
