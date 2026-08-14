@@ -260,10 +260,10 @@ release_workflow(ProjectRoot, check, #{release := {tag, Tag}}, Options) ->
     case read_workflow(Path, Options) of
         {present, Content} ->
             case workflow_name(Content) of
-                {ok, "release-" ++ Tag} ->
+                {ok, Tag} ->
                     {ok, []};
                 {ok, Name} ->
-                    {error, {workflow_invalid, Path, {name_mismatch, "release-" ++ Tag, Name}}};
+                    {error, {workflow_invalid, Path, {name_mismatch, Tag, Name}}};
                 {error, Reason} ->
                     {error, {workflow_invalid, Path, Reason}}
             end;
@@ -276,7 +276,7 @@ release_workflow(ProjectRoot, write, #{release := {tag, Tag}}, Options) ->
     Path = release_workflow_path(ProjectRoot),
     case read_workflow(Path, Options) of
         {present, Content} ->
-            case replace_workflow_name(Content, "release-" ++ Tag) of
+            case replace_workflow_name(Content, Tag) of
                 {ok, NewContent} ->
                     {ok, [{workflow, Path, Content, NewContent}]};
                 {error, Reason} ->
@@ -732,11 +732,16 @@ check_file(#{content := Content}, Expected) ->
                                 )};
                         true ->
                             case canonical_separator(Candidates, Lines) of
-                                true ->
-                                    ReleaseTag = release_tag(Candidates, Expected),
-                                    {ok, #{release_tag => ReleaseTag}};
                                 false ->
-                                    {error, [wrong_separator]}
+                                    {error, [wrong_separator]};
+                                true ->
+                                    case unauthorized_badges(Lines) of
+                                        [] ->
+                                            ReleaseTag = release_tag(Candidates, Expected),
+                                            {ok, #{release_tag => ReleaseTag}};
+                                        _ ->
+                                            {error, [unexpected_badge]}
+                                    end
                             end
                     end
             end
@@ -838,12 +843,51 @@ release_tag(Candidates, Expected) ->
 transform_file(#{content := Content} = File, Expected) ->
     Lines = split_lines(Content),
     Candidates = candidates(Lines),
-    NewContent =
+    Managed =
         case Candidates of
             [] -> insert_new_block(Lines, Expected);
             _ -> replace_old_block(Lines, Candidates, Expected)
         end,
-    File#{content => NewContent}.
+    File#{content => remove_unauthorized_badges(Managed)}.
+
+remove_unauthorized_badges(Content) ->
+    render_lines(remove_badge_lines(split_lines(Content))).
+
+remove_badge_lines([]) ->
+    [];
+remove_badge_lines([{Body, _Eol} = Line | Rest]) ->
+    Text = badge_text(Body),
+    case badge_like(Text) andalso candidate(Text) =:= none of
+        true ->
+            case Rest of
+                [{<<>>, _} | Rest1] -> Rest1;
+                _ -> Rest
+            end;
+        false ->
+            [Line | remove_badge_lines(Rest)]
+    end.
+
+badge_text(Body) ->
+    binary_to_list(trim_binary(Body)).
+
+badge_like(Text) ->
+    lists:prefix("[![", Text) andalso
+        string:find(Text, "](") =/= nomatch andalso
+        lists:any(
+            fun(Ext) -> string:find(Text, Ext ++ ")") =/= nomatch end,
+            [".svg", ".png", ".jpg", ".jpeg", ".gif"]
+        ).
+
+unauthorized_badges(Lines) ->
+    [
+        Index
+     || {Index, {Body, _Eol}} <- lists:zip(
+            lists:seq(0, length(Lines) - 1),
+            Lines
+        ),
+        badge_like(badge_text(Body)),
+        candidate(badge_text(Body)) =:= none
+    ].
 
 insert_new_block(Lines, Expected) ->
     Eol = default_eol(Lines),

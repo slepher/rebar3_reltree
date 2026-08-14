@@ -1,6 +1,6 @@
 [![CI](https://github.com/slepher/rebar3_reltree/actions/workflows/ci.yml/badge.svg?branch=master&event=push)](https://github.com/slepher/rebar3_reltree/actions/workflows/ci.yml?query=branch%3Amaster)
 
-[![CI](https://github.com/slepher/rebar3_reltree/actions/workflows/release.yml/badge.svg?branch=0.1.3&event=push)](https://github.com/slepher/rebar3_reltree/actions/workflows/release.yml?query=branch%3A0.1.3)
+[![CI](https://github.com/slepher/rebar3_reltree/actions/workflows/release.yml/badge.svg?branch=0.1.4&event=push)](https://github.com/slepher/rebar3_reltree/actions/workflows/release.yml?query=branch%3A0.1.4)
 
 # rebar3_reltree
 
@@ -26,7 +26,7 @@
 
 ```erlang
 {project_plugins, [
-    {rebar3_reltree, {git, "https://github.com/slepher/rebar3_reltree.git", {tag, "0.1.3"}}}
+    {rebar3_reltree, {git, "https://github.com/slepher/rebar3_reltree.git", {tag, "0.1.4"}}}
 ]}.
 ```
 
@@ -38,7 +38,7 @@ _checkouts/rebar3_reltree -> /path/to/rebar3_reltree
 
 插件与 Codex skill 相互独立：使用插件命令不要求先安装 skill。
 
-## 0.1.3 版本
+## 0.1.4 版本
 
 这是一个兼容性维护版本，无需迁移；除 Erlang/OTP 的 `kernel` 和 `stdlib` 应用外，
 没有固定的运行时依赖。
@@ -109,13 +109,13 @@ rebar3 reltree bgate --check
 ```
 
 - `--write` 维护 `ci.yml` 中的 master badge，并移除工具管理的 release badge。
-- `--write --tag` 还会把已有 `release.yml` 的顶层名称更新为 `release-<版本>`，并按照当前 `app.src` 版本写入 release badge。应在选择或提升版本后、创建正式 tag 前运行。
+- `--write --tag` 还会把已有 `release.yml` 的顶层名称更新为 `<版本>`，并按照当前 `app.src` 版本写入 release badge。应在选择或提升版本后、创建正式 tag 前运行。
 - `--check` 校验两个 workflow 名称，以及 master badge 和指向最高可达正式 tag 的 release badge。应在创建 tag 后运行。
 
 badge 行不再添加人为可见的前置文字。GitHub 会根据 workflow 顶层 `name` 显示名称；
-master workflow 使用 `master`，release workflow 使用 `release-<tag>`。
+master workflow 使用 `master`，release workflow 使用 `<tag>`。
 
-如果不存在 `.github/workflows/ci.yml`，命令只输出 warning，不伪造 badge。它从本地 `origin` 推导 `OWNER/REPO`，保留无关 badge 和正文，并同步维护 `README.md` 与已有的 `README.zh.md`。
+如果不存在 `.github/workflows/ci.yml`，命令只输出 warning，不伪造 badge。它从本地 `origin` 推导 `OWNER/REPO`，删除非受管 badge 行、保留正文，并同步维护 `README.md` 与已有的 `README.zh.md`。`--check` 遇到非受管 badge 时报错。
 
 ## 安装 Codex skill
 

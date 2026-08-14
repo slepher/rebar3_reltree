@@ -1,5 +1,5 @@
 {application, rebar3_reltree, [
     {description, "reltree Rebar3 plugin and repository skill installer"},
-    {vsn, "0.1.3"},
+    {vsn, "0.1.4"},
     {applications, [kernel, stdlib]}
 ]}.

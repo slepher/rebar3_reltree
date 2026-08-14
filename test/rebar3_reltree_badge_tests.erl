@@ -45,7 +45,7 @@ write_tag_updates_release_workflow_and_uses_path_badges_test() ->
         {ok, #{status := written}} = run(Root, write, #{tag => true}),
         ?assertEqual(CIContent, read(CI)),
         ?assertEqual(
-            <<"name: release-0.1.0 # preserve\n", "jobs:\n  build:\n    name: nested\n">>,
+            <<"name: 0.1.0 # preserve\n", "jobs:\n  build:\n    name: nested\n">>,
             read(ReleaseWorkflow)
         ),
         Text = read(README),
@@ -124,7 +124,7 @@ no_formal_tag_writes_master_only_and_preserves_content_test() ->
     try
         English = filename:join(Root, "README.md"),
         Chinese = filename:join(Root, "README.zh.md"),
-        Body = <<"# English\n\n[![Hex](https://hex.pm/badge.svg)](https://hex.pm)\ntext\n">>,
+        Body = <<"# English\n\n[![License](license)](license)\ntext\n">>,
         ZhBody = <<"# 中文\n\n[![License](license)](license)\n正文\n">>,
         ok = file:write_file(English, Body),
         ok = file:write_file(Chinese, ZhBody),
@@ -135,7 +135,7 @@ no_formal_tag_writes_master_only_and_preserves_content_test() ->
         Master = list_to_binary(master("acme/no-tag")),
         ?assertEqual(<<Master/binary, "\n\n", Body/binary>>, EnglishAfter),
         ?assertEqual(<<Master/binary, "\n\n", ZhBody/binary>>, ChineseAfter),
-        ?assertNotEqual(none, binary:match(EnglishAfter, <<"Hex">>)),
+        ?assertNotEqual(none, binary:match(EnglishAfter, <<"License">>)),
         ?assertNotEqual(none, binary:match(ChineseAfter, <<"License">>)),
         ?assertEqual(
             BeforeProject,
@@ -149,6 +149,53 @@ no_formal_tag_writes_master_only_and_preserves_content_test() ->
         {ok, #{status := checked}} = run(Root, check, #{}),
         ?assertEqual(EnglishAfter, read(English)),
         ?assertEqual(ChineseAfter, read(Chinese))
+    after
+        rebar3_reltree_fixtures:cleanup(Root)
+    end.
+
+check_rejects_unauthorized_badge_test() ->
+    Root = fixture("https://github.com/acme/extra-badge.git"),
+    try
+        rebar3_reltree_fixtures:git_tag(Root, "0.1.0"),
+        set_release_workflow(Root, "0.1.0"),
+        README = filename:join(Root, "README.md"),
+        ok = file:write_file(
+            README,
+            list_to_binary(
+                master("acme/extra-badge") ++
+                    "\n\n" ++
+                    release("acme/extra-badge", "0.1.0") ++
+                    "\n\n" ++
+                    "[![CI](https://github.com/acme/extra-badge/actions/workflows/ci.yml/badge.svg)](https://github.com/acme/extra-badge/actions/workflows/ci.yml)\n"
+            )
+        ),
+        ?assertMatch({error, {badge_mismatch, _}}, run(Root, check, #{}))
+    after
+        rebar3_reltree_fixtures:cleanup(Root)
+    end.
+
+write_removes_unauthorized_badge_test() ->
+    Root = fixture("https://github.com/acme/extra-badge.git"),
+    try
+        rebar3_reltree_fixtures:git_tag(Root, "0.1.0"),
+        set_release_workflow(Root, "0.1.0"),
+        README = filename:join(Root, "README.md"),
+        Legacy =
+            "[![CI](https://github.com/acme/extra-badge/actions/workflows/ci.yml/badge.svg)](https://github.com/acme/extra-badge/actions/workflows/ci.yml)",
+        ok = file:write_file(
+            README,
+            list_to_binary(
+                master("acme/extra-badge") ++
+                    "\n\n" ++
+                    release("acme/extra-badge", "0.1.0") ++
+                    "\n\n" ++
+                    Legacy ++ "\n"
+            )
+        ),
+        {ok, #{status := written}} = run(Root, write, #{tag => true}),
+        Text = read(README),
+        ?assertEqual(nomatch, binary:match(Text, list_to_binary(Legacy))),
+        ?assertMatch({ok, #{status := checked}}, run(Root, check, #{}))
     after
         rebar3_reltree_fixtures:cleanup(Root)
     end.
@@ -701,7 +748,7 @@ fixture(Origin) ->
     rebar3_reltree_fixtures:write_file(workflow(Root), <<"name: master\n">>),
     rebar3_reltree_fixtures:write_file(
         release_workflow(Root),
-        <<"name: release-0.1.0\n">>
+        <<"name: 0.1.0\n">>
     ),
     Root.
 
@@ -712,7 +759,7 @@ release_workflow(Root) ->
 
 set_release_workflow(Root, Tag) ->
     rebar3_reltree_fixtures:write_file(
-        release_workflow(Root), list_to_binary("name: release-" ++ Tag ++ "\n")
+        release_workflow(Root), list_to_binary("name: " ++ Tag ++ "\n")
     ).
 
 master(Repo) ->
