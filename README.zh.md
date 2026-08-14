@@ -1,6 +1,6 @@
 [![CI](https://github.com/slepher/rebar3_reltree/actions/workflows/ci.yml/badge.svg?branch=master&event=push)](https://github.com/slepher/rebar3_reltree/actions/workflows/ci.yml?query=branch%3Amaster)
 
-[![CI](https://github.com/slepher/rebar3_reltree/actions/workflows/release.yml/badge.svg?branch=0.1.2&event=push)](https://github.com/slepher/rebar3_reltree/actions/workflows/release.yml?query=branch%3A0.1.2)
+[![CI](https://github.com/slepher/rebar3_reltree/actions/workflows/release.yml/badge.svg?branch=0.1.3&event=push)](https://github.com/slepher/rebar3_reltree/actions/workflows/release.yml?query=branch%3A0.1.3)
 
 # rebar3_reltree
 
@@ -26,7 +26,7 @@
 
 ```erlang
 {project_plugins, [
-    {rebar3_reltree, {git, "https://github.com/slepher/rebar3_reltree.git", {tag, "0.1.2"}}}
+    {rebar3_reltree, {git, "https://github.com/slepher/rebar3_reltree.git", {tag, "0.1.3"}}}
 ]}.
 ```
 
@@ -38,7 +38,7 @@ _checkouts/rebar3_reltree -> /path/to/rebar3_reltree
 
 插件与 Codex skill 相互独立：使用插件命令不要求先安装 skill。
 
-## 0.1.2 版本
+## 0.1.3 版本
 
 这是一个兼容性维护版本，无需迁移；除 Erlang/OTP 的 `kernel` 和 `stdlib` 应用外，
 没有固定的运行时依赖。
