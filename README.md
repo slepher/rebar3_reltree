@@ -1,6 +1,6 @@
 [![CI](https://github.com/slepher/rebar3_reltree/actions/workflows/ci.yml/badge.svg?branch=master&event=push)](https://github.com/slepher/rebar3_reltree/actions/workflows/ci.yml?query=branch%3Amaster)
 
-[![CI](https://github.com/slepher/rebar3_reltree/actions/workflows/release.yml/badge.svg?branch=0.1.3&event=push)](https://github.com/slepher/rebar3_reltree/actions/workflows/release.yml?query=branch%3A0.1.3)
+[![CI](https://github.com/slepher/rebar3_reltree/actions/workflows/release.yml/badge.svg?branch=0.2.0&event=push)](https://github.com/slepher/rebar3_reltree/actions/workflows/release.yml?query=branch%3A0.2.0)
 
 # rebar3_reltree
 
@@ -26,7 +26,7 @@ Add the plugin to the target project's `rebar.config`:
 
 ```erlang
 {project_plugins, [
-    {rebar3_reltree, {git, "https://github.com/slepher/rebar3_reltree.git", {tag, "0.1.3"}}}
+    {rebar3_reltree, {git, "https://github.com/slepher/rebar3_reltree.git", {tag, "0.2.0"}}}
 ]}.
 ```
 
@@ -38,7 +38,7 @@ _checkouts/rebar3_reltree -> /path/to/rebar3_reltree
 
 The plugin and the Codex skill are independent: plugin commands do not require the skill to be installed.
 
-## Release 0.1.3
+## Release 0.2.0
 
 This is a compatibility maintenance release. It has no migration requirements and no fixed
 runtime dependencies beyond the Erlang/OTP `kernel` and `stdlib` applications.
@@ -109,14 +109,14 @@ rebar3 reltree bgate --check
 ```
 
 - `--write` maintains the master badge in `ci.yml` and removes managed release badges.
-- `--write --tag` also updates the top-level name of the existing `release.yml` to `release-<version>` and writes its badge for the current `app.src` version. Use it after selecting or increasing the version and before creating the formal tag.
+- `--write --tag` also updates the top-level name of the existing `release.yml` to `<version>` and writes its badge for the current `app.src` version. Use it after selecting or increasing the version and before creating the formal tag.
 - `--check` verifies both workflow names and the master/release badges for the highest reachable formal tag. Use it after tagging.
 
 The badge lines contain no manually added display label. GitHub derives the visible label
 from the workflow's top-level `name`; the master workflow is named `master` and the release
-workflow is named `release-<tag>`.
+workflow is named `<tag>`.
 
-When `.github/workflows/ci.yml` is absent, the command emits a warning and does not invent badges. It derives `OWNER/REPO` from the local `origin`, preserves unrelated badges and prose, and keeps `README.md` and an existing `README.zh.md` aligned.
+When `.github/workflows/ci.yml` is absent, the command emits a warning and does not invent badges. It derives `OWNER/REPO` from the local `origin`, removes badge lines it does not manage, preserves prose, and keeps `README.md` and an existing `README.zh.md` aligned. `--check` fails when a README still contains a badge that reltree does not manage.
 
 ## Install the Codex skill
 
