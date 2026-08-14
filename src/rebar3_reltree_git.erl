@@ -18,23 +18,39 @@ read(ProjectPath) ->
         {ok, Head0} ->
             case command(ProjectPath, ["tag", "--merged", "HEAD"], #{}) of
                 {ok, Tags0} ->
-                    case command(ProjectPath, ["tag", "--points-at", "HEAD"],
-                                 #{}) of
+                    case
+                        command(
+                            ProjectPath,
+                            ["tag", "--points-at", "HEAD"],
+                            #{}
+                        )
+                    of
                         {ok, HeadTags0} ->
-                            Origin = case command(ProjectPath,
-                                                   ["config", "--get",
-                                                    "remote.origin.url"], #{}) of
-                                         {ok, Url} -> {ok, Url};
-                                         {error, {exit, 1, _}} -> none;
-                                         {error, _} -> none
-                                     end,
+                            Origin =
+                                case
+                                    command(
+                                        ProjectPath,
+                                        [
+                                            "config",
+                                            "--get",
+                                            "remote.origin.url"
+                                        ],
+                                        #{}
+                                    )
+                                of
+                                    {ok, Url} -> {ok, Url};
+                                    {error, {exit, 1, _}} -> none;
+                                    {error, _} -> none
+                                end,
                             Tags = lines(Tags0),
                             HeadTags = lines(HeadTags0),
-                            {ok, #{head => trim(Head0),
-                                   tags => Tags,
-                                   reachable_tags => Tags,
-                                   head_tags => HeadTags,
-                                   origin => Origin}};
+                            {ok, #{
+                                head => trim(Head0),
+                                tags => Tags,
+                                reachable_tags => Tags,
+                                head_tags => HeadTags,
+                                origin => Origin
+                            }};
                         {error, Reason} ->
                             {error, {git_head_tags, Reason}}
                     end;
@@ -53,12 +69,26 @@ command(Directory, Args, Options) when is_list(Args), is_map(Options) ->
     case executable() of
         {ok, Executable} ->
             Timeout = maps:get(timeout, Options, ?TIMEOUT),
-            case open_port({spawn_executable, Executable},
-                           [{args, Args}, {cd, rebar3_reltree_fs:absolute(
-                                             Directory)}, binary,
-                            exit_status, stderr_to_stdout, hide,
-                            {env, [{"GIT_TERMINAL_PROMPT", "0"},
-                                   {"GIT_ASKPASS", ""}]}]) of
+            case
+                open_port(
+                    {spawn_executable, Executable},
+                    [
+                        {args, Args},
+                        {cd,
+                            rebar3_reltree_fs:absolute(
+                                Directory
+                            )},
+                        binary,
+                        exit_status,
+                        stderr_to_stdout,
+                        hide,
+                        {env, [
+                            {"GIT_TERMINAL_PROMPT", "0"},
+                            {"GIT_ASKPASS", ""}
+                        ]}
+                    ]
+                )
+            of
                 Port when is_port(Port) ->
                     collect(Port, [], 0, Timeout);
                 Other ->
@@ -92,8 +122,11 @@ collect(Port, Chunks, Size, Timeout) ->
 %% every selector.  Selection is performed on the bounded, read-only output;
 %% no shell or Git command other than ls-remote is involved.
 -spec lookup(string(), map(), map()) -> {ok, string()} | {error, term()}.
-lookup(Url, Selector, Options) when is_list(Url), is_map(Selector),
-                                   is_map(Options) ->
+lookup(Url, Selector, Options) when
+    is_list(Url),
+    is_map(Selector),
+    is_map(Options)
+->
     Args = ["ls-remote", "--", Url],
     case command("/", Args, Options) of
         {ok, Output} ->
@@ -128,15 +161,23 @@ parse_rows([Line | Rest], Acc) ->
 select_revision(Rows, #{kind := head}) ->
     select_one([Object || {"HEAD", Object} <- Rows]);
 select_revision(Rows, #{kind := branch, value := Value}) ->
-    select_one([Object || {Ref, Object} <- Rows,
-                          Ref =:= "refs/heads/" ++ Value]);
+    select_one([
+        Object
+     || {Ref, Object} <- Rows,
+        Ref =:= "refs/heads/" ++ Value
+    ]);
 select_revision(Rows, #{kind := tag, value := Value}) ->
     PeeledRef = "refs/tags/" ++ Value ++ "^{}",
     DirectRef = "refs/tags/" ++ Value,
     case [Object || {Ref, Object} <- Rows, Ref =:= PeeledRef] of
-        [] -> select_one([Object || {Ref, Object} <- Rows,
-                                    Ref =:= DirectRef]);
-        Peeled -> select_one(Peeled)
+        [] ->
+            select_one([
+                Object
+             || {Ref, Object} <- Rows,
+                Ref =:= DirectRef
+            ]);
+        Peeled ->
+            select_one(Peeled)
     end;
 select_revision(Rows, #{kind := ref, value := Pattern}) ->
     select_one([Object || {Ref, Object} <- Rows, glob_match(Pattern, Ref)]);
@@ -147,7 +188,8 @@ select_one([]) ->
     {error, no_matching_revision};
 select_one(Objects) ->
     case lists:all(fun valid_object_id/1, Objects) of
-        false -> {error, malformed_object_id};
+        false ->
+            {error, malformed_object_id};
         true ->
             case lists:usort(Objects) of
                 [Object] -> {ok, Object};
@@ -157,7 +199,7 @@ select_one(Objects) ->
 
 valid_object_id(Object) when is_list(Object) ->
     (length(Object) =:= 40 orelse length(Object) =:= 64) andalso
-    lists:all(fun is_hex/1, Object);
+        lists:all(fun is_hex/1, Object);
 valid_object_id(_Object) ->
     false.
 
@@ -166,26 +208,35 @@ is_hex(Char) when Char >= $a, Char =< $f -> true;
 is_hex(Char) when Char >= $A, Char =< $F -> true;
 is_hex(_Char) -> false.
 
-glob_match([], []) -> true;
+glob_match([], []) ->
+    true;
 glob_match([$* | Rest], Value) ->
     glob_match(Rest, Value) orelse
-    case Value of
-        [] -> false;
-        [_ | Tail] -> glob_match([$* | Rest], Tail)
-    end;
+        case Value of
+            [] -> false;
+            [_ | Tail] -> glob_match([$* | Rest], Tail)
+        end;
 glob_match([Expected | Pattern], [Expected | Value]) ->
     glob_match(Pattern, Value);
-glob_match([], _Value) -> false;
-glob_match(_Pattern, []) -> false;
-glob_match(_Pattern, _Value) -> false.
+glob_match([], _Value) ->
+    false;
+glob_match(_Pattern, []) ->
+    false;
+glob_match(_Pattern, _Value) ->
+    false.
 
 sanitize_reason({exit, Status, _Output}) when is_integer(Status) ->
     {git_exit, Status};
-sanitize_reason(timeout) -> timeout;
-sanitize_reason(output_too_large) -> output_too_large;
-sanitize_reason(git_executable_unavailable) -> git_executable_unavailable;
-sanitize_reason({port_open, _}) -> port_open;
-sanitize_reason(_Other) -> git_lookup_failed.
+sanitize_reason(timeout) ->
+    timeout;
+sanitize_reason(output_too_large) ->
+    output_too_large;
+sanitize_reason(git_executable_unavailable) ->
+    git_executable_unavailable;
+sanitize_reason({port_open, _}) ->
+    port_open;
+sanitize_reason(_Other) ->
+    git_lookup_failed.
 
 trim(Binary) when is_binary(Binary) ->
     unicode:characters_to_binary(string:trim(binary_to_list(Binary)));
@@ -193,5 +244,8 @@ trim(List) when is_list(List) ->
     unicode:characters_to_binary(string:trim(List)).
 
 lines(Binary) ->
-    [Line || Line <- string:split(binary_to_list(Binary), "\n", all),
-             string:trim(Line) =/= ""].
+    [
+        Line
+     || Line <- string:split(binary_to_list(Binary), "\n", all),
+        string:trim(Line) =/= ""
+    ].

@@ -43,11 +43,14 @@ regular(Path) ->
 -spec identity(filename:filename_all()) -> {ok, term()} | {error, term()}.
 identity(Path) ->
     case file:read_link_info(Path) of
-        {ok, #file_info{type = directory,
-                        major_device = Major,
-                        minor_device = Minor,
-                        inode = Inode}}
-          when is_integer(Inode), is_integer(Major), is_integer(Minor) ->
+        {ok, #file_info{
+            type = directory,
+            major_device = Major,
+            minor_device = Minor,
+            inode = Inode
+        }} when
+            is_integer(Inode), is_integer(Major), is_integer(Minor)
+        ->
             {ok, {device_inode, Major, Minor, Inode}};
         {ok, #file_info{type = directory}} ->
             {ok, {path, canonical(Path)}};
@@ -82,13 +85,20 @@ resolve_checkout(Path, Seen, Depth) ->
                 {ok, #file_info{type = symlink}} ->
                     case file:read_link(Path) of
                         {ok, Target0} ->
-                            Target = case filename:pathtype(Target0) of
-                                         absolute -> Target0;
-                                         relative -> filename:join(
-                                           filename:dirname(Path), Target0)
-                                     end,
-                            resolve_checkout(canonical(Target),
-                                             [Path | Seen], Depth + 1);
+                            Target =
+                                case filename:pathtype(Target0) of
+                                    absolute ->
+                                        Target0;
+                                    relative ->
+                                        filename:join(
+                                            filename:dirname(Path), Target0
+                                        )
+                                end,
+                            resolve_checkout(
+                                canonical(Target),
+                                [Path | Seen],
+                                Depth + 1
+                            );
                         {error, Reason} ->
                             {error, {link_read, Reason}}
                     end;
@@ -114,10 +124,16 @@ atomic_write(Output0, Data0, Options) when is_map(Options) ->
             Temp = temporary_path(Output),
             case file:open(Temp, [write, binary, exclusive]) of
                 {ok, IoDevice} ->
-                    Result = write_and_replace(IoDevice, Temp, Output,
-                                               Data, Options),
+                    Result = write_and_replace(
+                        IoDevice,
+                        Temp,
+                        Output,
+                        Data,
+                        Options
+                    ),
                     case Result of
-                        {ok, _} -> Result;
+                        {ok, _} ->
+                            Result;
                         {error, _} = Error ->
                             _ = file:delete(Temp),
                             Error
@@ -131,16 +147,18 @@ atomic_write(Output0, Data0, Options) when is_map(Options) ->
 
 write_and_replace(IoDevice, Temp, Output, Data, Options) ->
     Fail = maps:get(fail_stage, Options, maps:get(fail, Options, none)),
-    WriteResult = case Fail of
-                      write -> {error, injected};
-                      _ -> file:write(IoDevice, Data)
-                  end,
+    WriteResult =
+        case Fail of
+            write -> {error, injected};
+            _ -> file:write(IoDevice, Data)
+        end,
     case WriteResult of
         ok ->
-            CloseResult = case Fail of
-                              close -> {error, injected};
-                              _ -> file:close(IoDevice)
-                          end,
+            CloseResult =
+                case Fail of
+                    close -> {error, injected};
+                    _ -> file:close(IoDevice)
+                end,
             case CloseResult of
                 ok ->
                     case revalidate_temp(Temp, Data) of
@@ -151,9 +169,7 @@ write_and_replace(IoDevice, Temp, Output, Data, Options) ->
                                 _ ->
                                     case file:rename(Temp, Output) of
                                         ok -> {ok, Output};
-                                        {error, Reason} ->
-                                            {error, {atomic_write, rename,
-                                                     Reason}}
+                                        {error, Reason} -> {error, {atomic_write, rename, Reason}}
                                     end
                             end;
                         {error, Reason} ->
@@ -177,5 +193,7 @@ revalidate_temp(Temp, Expected) ->
 
 temporary_path(Output) ->
     Token = integer_to_list(erlang:unique_integer([positive, monotonic])),
-    filename:join(filename:dirname(Output),
-                  "." ++ filename:basename(Output) ++ ".reltree-" ++ Token).
+    filename:join(
+        filename:dirname(Output),
+        "." ++ filename:basename(Output) ++ ".reltree-" ++ Token
+    ).

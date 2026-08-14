@@ -9,19 +9,20 @@ init(State) ->
 
 -spec option_spec() -> [tuple()].
 option_spec() ->
-    [{check, undefined, "check", boolean,
-      "Check workflow names and local README CI badges."},
-     {write, undefined, "write", boolean,
-      "Write the master README CI badge."},
-     {tag, undefined, "tag", boolean,
-      "With --write, prepare release.yml and write the release badge."}].
+    [
+        {check, undefined, "check", boolean, "Check workflow names and local README CI badges."},
+        {write, undefined, "write", boolean, "Write the master README CI badge."},
+        {tag, undefined, "tag", boolean,
+            "With --write, prepare release.yml and write the release badge."}
+    ].
 
 -spec do(term()) -> term().
 do(State) ->
     case request(State) of
         {ok, Request} ->
             case rebar3_reltree_badge:run(Request) of
-                {error, Reason} -> provider_error(Reason);
+                {error, Reason} ->
+                    provider_error(Reason);
                 {ok, Result} ->
                     io:put_chars(rebar3_reltree_badge:format_result(Result)),
                     {ok, State}
@@ -43,15 +44,20 @@ format_error(Reason) ->
 request(State) ->
     ProjectRoot = rebar_state:dir(State),
     Args0 = rebar_state:command_args(State),
-    Args = case Args0 of
-               ["bgate" | Rest] -> Rest;
-               Rest when is_list(Rest) -> Rest
-           end,
+    Args =
+        case Args0 of
+            ["bgate" | Rest] -> Rest;
+            Rest when is_list(Rest) -> Rest
+        end,
     case rebar3_reltree_request:parse_cli(["bgate" | Args]) of
         {ok, #{mode := Mode} = Parsed} ->
             rebar3_reltree_request:normalize_bgate(
-              #{cwd => ProjectRoot, mode => Mode,
-                tag => maps:get(tag, Parsed, false)});
+                #{
+                    cwd => ProjectRoot,
+                    mode => Mode,
+                    tag => maps:get(tag, Parsed, false)
+                }
+            );
         {help, bgate} ->
             {help, bgate};
         {error, _} = Error ->
@@ -62,8 +68,10 @@ provider_error(Reason) ->
     {error, {?MODULE, Reason}}.
 
 help() ->
-    ["Usage: reltree bgate [options]\n\n",
-     "Options (exactly one mode required):\n",
-     "  --check        verify workflow names and local README CI badges\n",
-     "  --write        update the master README CI badge\n",
-     "  --write --tag  prepare release.yml and write the release badge\n"].
+    [
+        "Usage: reltree bgate [options]\n\n",
+        "Options (exactly one mode required):\n",
+        "  --check        verify workflow names and local README CI badges\n",
+        "  --write        update the master README CI badge\n",
+        "  --write --tag  prepare release.yml and write the release badge\n"
+    ].

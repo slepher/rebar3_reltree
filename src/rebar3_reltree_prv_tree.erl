@@ -9,10 +9,11 @@ init(State) ->
 
 -spec option_spec() -> [tuple()].
 option_spec() ->
-    [{scan_roots, undefined, "scan-roots", string,
-      "Repeatable scan root, optionally ending in :deep."},
-     {rev, undefined, "rev", string,
-      "Revision lookup policy: false, auto, or true."}].
+    [
+        {scan_roots, undefined, "scan-roots", string,
+            "Repeatable scan root, optionally ending in :deep."},
+        {rev, undefined, "rev", string, "Revision lookup policy: false, auto, or true."}
+    ].
 
 -spec do(term()) -> term().
 do(State) ->
@@ -51,21 +52,25 @@ request_from_state(State) ->
         {ok, Cli} ->
             ConfigOptions = rebar_state:get(State, reltree, []),
             rebar3_reltree_request:normalize(
-              #{cwd => ProjectRoot,
-                project_root => ProjectRoot,
-                profile => Profile,
-                build_base_dir => BuildBase,
-                config_options => ConfigOptions,
-                cli_scan_roots => maps:get(cli_scan_roots, Cli),
-                cli_rev => maps:get(cli_rev, Cli)})
+                #{
+                    cwd => ProjectRoot,
+                    project_root => ProjectRoot,
+                    profile => Profile,
+                    build_base_dir => BuildBase,
+                    config_options => ConfigOptions,
+                    cli_scan_roots => maps:get(cli_scan_roots, Cli),
+                    cli_rev => maps:get(cli_rev, Cli)
+                }
+            )
     end.
 
 command_cli(State) ->
     Args0 = rebar_state:command_args(State),
-    Args = case Args0 of
-               ["tree" | Rest] -> Rest;
-               Rest when is_list(Rest) -> Rest
-           end,
+    Args =
+        case Args0 of
+            ["tree" | Rest] -> Rest;
+            Rest when is_list(Rest) -> Rest
+        end,
     case rebar3_reltree_request:parse_cli(["tree" | Args]) of
         {ok, Cli} -> {ok, Cli};
         {error, Reason} -> {error, Reason};
@@ -84,9 +89,11 @@ help() ->
     help_for(tree).
 
 help_for(tree) ->
-    ["Usage: reltree tree [options]\n\n",
-     "Options:\n",
-     "  --scan-roots PATH[:deep]  repeatable; replaces configured roots\n",
-     "  --rev false|auto|true     revision lookup policy\n\n",
-     "Defaults: scan root '..' shallow; rev auto.\n",
-     "Output: _build/<profile>/reltree/project.md\n"].
+    [
+        "Usage: reltree tree [options]\n\n",
+        "Options:\n",
+        "  --scan-roots PATH[:deep]  repeatable; replaces configured roots\n",
+        "  --rev false|auto|true     revision lookup policy\n\n",
+        "Defaults: scan root '..' shallow; rev auto.\n",
+        "Output: _build/<profile>/reltree/project.md\n"
+    ].

@@ -3,14 +3,25 @@
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
--export([all/0, provider_and_cli_surface/1, active_profile_and_scan_boundary/1,
-         deep_relationship_closure/1, anomaly_and_atomic_boundary/1,
-         status_and_report_facts/1, bgate_surface/1]).
+-export([
+    all/0,
+    provider_and_cli_surface/1,
+    active_profile_and_scan_boundary/1,
+    deep_relationship_closure/1,
+    anomaly_and_atomic_boundary/1,
+    status_and_report_facts/1,
+    bgate_surface/1
+]).
 
 all() ->
-    [provider_and_cli_surface, active_profile_and_scan_boundary,
-     deep_relationship_closure,
-     anomaly_and_atomic_boundary, status_and_report_facts, bgate_surface].
+    [
+        provider_and_cli_surface,
+        active_profile_and_scan_boundary,
+        deep_relationship_closure,
+        anomaly_and_atomic_boundary,
+        status_and_report_facts,
+        bgate_surface
+    ].
 
 provider_and_cli_surface(_Config) ->
     Root = rebar3_reltree_fixtures:new_root(),
@@ -20,21 +31,37 @@ provider_and_cli_surface(_Config) ->
         State1 = rebar_state:dir(State0, Root),
         State2 = rebar_state:command_args(State1, ["tree"]),
         {ok, State2} = rebar3_reltree_prv_tree:do(State2),
-        ProviderReport = filename:join([Root, "_build", "default", "reltree",
-                                        "project.md"]),
+        ProviderReport = filename:join([
+            Root,
+            "_build",
+            "default",
+            "reltree",
+            "project.md"
+        ]),
         {ok, ProviderBytes} = file:read_file(ProviderReport),
-        ?assertMatch({_, _}, binary:match(ProviderBytes,
-                                          <<"network_sync_at: not-performed">>)),
+        ?assertMatch(
+            {_, _},
+            binary:match(
+                ProviderBytes,
+                <<"network_sync_at: not-performed">>
+            )
+        ),
         rebar3_reltree_fixtures:cleanup(Root),
         Root2 = rebar3_reltree_fixtures:new_root(),
         try
-        rebar3_reltree_fixtures:write_project(
-              Root2, ct_cli, [], "0.1.0"),
+            rebar3_reltree_fixtures:write_project(
+                Root2, ct_cli, [], "0.1.0"
+            ),
             State3 = rebar_state:dir(rebar_state:new([]), Root2),
             State4 = rebar_state:command_args(State3, ["tree"]),
             {ok, State4} = rebar3_reltree_prv_tree:do(State4),
-            ?assert(filelib:is_regular(filename:join(
-                       [Root2, "_build", "default", "reltree", "project.md"])))
+            ?assert(
+                filelib:is_regular(
+                    filename:join(
+                        [Root2, "_build", "default", "reltree", "project.md"]
+                    )
+                )
+            )
         after
             rebar3_reltree_fixtures:cleanup(Root2)
         end
@@ -53,26 +80,52 @@ active_profile_and_scan_boundary(_Config) ->
         State2 = rebar_state:current_profiles(State1, [default, test]),
         State3 = rebar_state:command_args(State2, ["tree"]),
         {ok, State3} = rebar3_reltree_prv_tree:do(State3),
-        ActiveOutput = filename:join([Root, "_build", "test", "reltree",
-                                      "project.md"]),
-        DefaultOutput = filename:join([Root, "_build", "default", "reltree",
-                                       "project.md"]),
+        ActiveOutput = filename:join([
+            Root,
+            "_build",
+            "test",
+            "reltree",
+            "project.md"
+        ]),
+        DefaultOutput = filename:join([
+            Root,
+            "_build",
+            "default",
+            "reltree",
+            "project.md"
+        ]),
         ?assert(filelib:is_regular(ActiveOutput)),
         ?assertNot(filelib:is_regular(DefaultOutput)),
 
         Link = filename:join(Root, "scan-link"),
         ok = file:make_symlink(ScanTarget, Link),
         {Catalog, Warnings} = rebar3_reltree_scan:catalog(
-                                Root, [{Root, deep}]),
+            Root, [{Root, deep}]
+        ),
         ?assert(maps:is_key(rebar3_reltree_fs:canonical(Root), Catalog)),
-        ?assertNot(maps:is_key(rebar3_reltree_fs:canonical(ScanTarget),
-                               Catalog)),
-        ?assert(lists:any(
-                  fun(#{path := Path, reason := scan_entry_skipped,
-                        detail := symlink}) ->
-                          Path =:= rebar3_reltree_fs:canonical(Link);
-                     (_) -> false
-                  end, Warnings))
+        ?assertNot(
+            maps:is_key(
+                rebar3_reltree_fs:canonical(ScanTarget),
+                Catalog
+            )
+        ),
+        ?assert(
+            lists:any(
+                fun
+                    (
+                        #{
+                            path := Path,
+                            reason := scan_entry_skipped,
+                            detail := symlink
+                        }
+                    ) ->
+                        Path =:= rebar3_reltree_fs:canonical(Link);
+                    (_) ->
+                        false
+                end,
+                Warnings
+            )
+        )
     after
         rebar3_reltree_fixtures:cleanup(Root),
         rebar3_reltree_fixtures:cleanup(ScanTarget)
@@ -97,9 +150,11 @@ deep_relationship_closure(_Config) ->
         ?assertEqual(3, length(maps:get(included, Graph))),
         ?assertEqual(2, length(maps:get(edges, Graph))),
         {ok, First} = rebar3_reltree_project:generate(
-                        Request, #{clock => fixed_clock()}),
+            Request, #{clock => fixed_clock()}
+        ),
         {ok, Second} = rebar3_reltree_project:generate(
-                         Request, #{clock => fixed_clock()}),
+            Request, #{clock => fixed_clock()}
+        ),
         ?assertEqual(maps:get(bytes, First), maps:get(bytes, Second))
     after
         rebar3_reltree_fixtures:cleanup(Workspace)
@@ -110,21 +165,35 @@ anomaly_and_atomic_boundary(_Config) ->
     try
         Current = filename:join(Workspace, "current"),
         ok = file:make_dir(Current),
-        rebar3_reltree_fixtures:write_project(Current, current, [broken],
-                                              "0.1.0"),
+        rebar3_reltree_fixtures:write_project(
+            Current,
+            current,
+            [broken],
+            "0.1.0"
+        ),
         CheckoutDir = filename:join(Current, "_checkouts"),
         ok = file:make_dir(CheckoutDir),
-        ok = file:make_symlink(filename:join(Workspace, "missing"),
-                               filename:join(CheckoutDir, "broken")),
+        ok = file:make_symlink(
+            filename:join(Workspace, "missing"),
+            filename:join(CheckoutDir, "broken")
+        ),
         Request = request(Current, [], default),
         {ok, Result} = rebar3_reltree_project:generate(
-                         Request, #{clock => fixed_clock()}),
-        ?assertMatch({_, _}, binary:match(maps:get(bytes, Result),
-                                          <<"insufficient-local-data">>)),
+            Request, #{clock => fixed_clock()}
+        ),
+        ?assertMatch(
+            {_, _},
+            binary:match(
+                maps:get(bytes, Result),
+                <<"insufficient-local-data">>
+            )
+        ),
         {error, {atomic_write, close, injected}} =
             rebar3_reltree_fs:atomic_write(
-              maps:get(output_path, Request), <<"replacement">>,
-              #{fail_stage => close}),
+                maps:get(output_path, Request),
+                <<"replacement">>,
+                #{fail_stage => close}
+            ),
         {ok, Prior} = file:read_file(maps:get(output_path, Request)),
         ?assertEqual(maps:get(bytes, Result), Prior)
     after
@@ -132,43 +201,77 @@ anomaly_and_atomic_boundary(_Config) ->
     end.
 
 status_and_report_facts(_Config) ->
-    ?assertEqual([insufficient_local_data, update_required, up_to_date],
-                 rebar3_reltree_status:values()),
-    ?assertEqual(insufficient_local_data,
-                 maps:get(status, rebar3_reltree_version:evaluate(
-                                   "2.0.0", ["1.2.0"]))),
-    Model = #{format_version => 2, current => "/tmp/current",
-              current_name => current, status => up_to_date,
-              local_sync_at => "2020-01-02T03:04:05Z",
-              nodes => [], edges => [], warnings => [],
-              local_only_caveats => [network_sync_not_performed]},
+    ?assertEqual(
+        [insufficient_local_data, update_required, up_to_date],
+        rebar3_reltree_status:values()
+    ),
+    ?assertEqual(
+        insufficient_local_data,
+        maps:get(
+            status,
+            rebar3_reltree_version:evaluate(
+                "2.0.0", ["1.2.0"]
+            )
+        )
+    ),
+    Model = #{
+        format_version => 2,
+        current => "/tmp/current",
+        current_name => current,
+        status => up_to_date,
+        local_sync_at => "2020-01-02T03:04:05Z",
+        nodes => [],
+        edges => [],
+        warnings => [],
+        local_only_caveats => [network_sync_not_performed]
+    },
     {ok, Bytes} = rebar3_reltree_report:render(Model),
-    ?assertMatch({_, _}, binary:match(Bytes,
-                                      <<"format_version: 2">>)),
-    ?assertMatch({_, _}, binary:match(Bytes,
-                                      <<"nodes\n- none">>)),
-    ?assertMatch({_, _}, binary:match(Bytes,
-                                      <<"network_sync_at: not-performed">>)).
+    ?assertMatch(
+        {_, _},
+        binary:match(
+            Bytes,
+            <<"format_version: 2">>
+        )
+    ),
+    ?assertMatch(
+        {_, _},
+        binary:match(
+            Bytes,
+            <<"nodes\n- none">>
+        )
+    ),
+    ?assertMatch(
+        {_, _},
+        binary:match(
+            Bytes,
+            <<"network_sync_at: not-performed">>
+        )
+    ).
 
 bgate_surface(_Config) ->
     Root = rebar3_reltree_fixtures:new_root(),
     try
         rebar3_reltree_fixtures:write_project(Root, ct_bgate, [], "0.1.0"),
         rebar3_reltree_fixtures:add_origin(
-          Root, "https://github.com/acme/ct-bgate.git"),
+            Root, "https://github.com/acme/ct-bgate.git"
+        ),
         rebar3_reltree_fixtures:write_file(
-          filename:join([Root, ".github", "workflows", "ci.yml"]),
-          <<"name: master\n">>),
+            filename:join([Root, ".github", "workflows", "ci.yml"]),
+            <<"name: master\n">>
+        ),
         rebar3_reltree_fixtures:write_file(
-          filename:join([Root, ".github", "workflows", "release.yml"]),
-          <<"name: release-0.1.0\n">>),
+            filename:join([Root, ".github", "workflows", "release.yml"]),
+            <<"name: release-0.1.0\n">>
+        ),
         README = filename:join(Root, "README.md"),
         rebar3_reltree_fixtures:write_file(README, <<"content\n">>),
         State0 = rebar_state:dir(rebar_state:new([]), Root),
         WriteState = rebar_state:command_args(State0, ["bgate", "--write"]),
         CheckState = rebar_state:command_args(State0, ["bgate", "--check"]),
-        WriteTagState = rebar_state:command_args(State0,
-                                                ["bgate", "--write", "--tag"]),
+        WriteTagState = rebar_state:command_args(
+            State0,
+            ["bgate", "--write", "--tag"]
+        ),
         {ok, WriteState} = rebar3_reltree_prv_bgate:do(WriteState),
         {ok, CheckState} = rebar3_reltree_prv_bgate:do(CheckState),
         {ok, Bytes} = file:read_file(README),
@@ -176,8 +279,13 @@ bgate_surface(_Config) ->
         ?assertMatch(nomatch, binary:match(Bytes, <<"release.yml">>)),
         {ok, WriteTagState} = rebar3_reltree_prv_bgate:do(WriteTagState),
         {ok, TagBytes} = file:read_file(README),
-        ?assertMatch({_, _}, binary:match(TagBytes,
-                                         <<"actions/workflows/release.yml">>)),
+        ?assertMatch(
+            {_, _},
+            binary:match(
+                TagBytes,
+                <<"actions/workflows/release.yml">>
+            )
+        ),
         rebar3_reltree_fixtures:git_tag(Root, "0.1.0"),
         {ok, CheckState} = rebar3_reltree_prv_bgate:do(CheckState),
         ?assertNot(filelib:is_regular(filename:join(Root, "project.md")))
@@ -187,9 +295,14 @@ bgate_surface(_Config) ->
 
 request(Root, ScanRoots, Profile) ->
     Build = filename:join([Root, "_build", atom_to_list(Profile)]),
-    #{command => tree, project_root => Root, profile => Profile,
-      build_base_dir => Build,
-      output_path => filename:join([Build, "reltree", "project.md"]),
-      scan_roots => ScanRoots, rev => auto}.
+    #{
+        command => tree,
+        project_root => Root,
+        profile => Profile,
+        build_base_dir => Build,
+        output_path => filename:join([Build, "reltree", "project.md"]),
+        scan_roots => ScanRoots,
+        rev => auto
+    }.
 
 fixed_clock() -> fun() -> {{2020, 1, 2}, {3, 4, 5}} end.

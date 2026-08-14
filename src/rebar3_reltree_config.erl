@@ -30,8 +30,10 @@ read_terms(Path) ->
 -spec dependency_name(term()) -> {ok, atom()} | error.
 dependency_name(Name) when is_atom(Name) ->
     {ok, Name};
-dependency_name(Declaration) when is_tuple(Declaration),
-                                 tuple_size(Declaration) >= 1 ->
+dependency_name(Declaration) when
+    is_tuple(Declaration),
+    tuple_size(Declaration) >= 1
+->
     case element(1, Declaration) of
         Name when is_atom(Name) -> {ok, Name};
         _ -> error
@@ -51,10 +53,14 @@ app_identity(ProjectPath) ->
         true ->
             case rebar3_reltree_fs:list_dir(SrcPath) of
                 {ok, Names} ->
-                    Files = [filename:join(SrcPath, Name) || Name <- Names,
-                             lists:suffix(".app.src", Name),
-                             rebar3_reltree_fs:regular(
-                               filename:join(SrcPath, Name))],
+                    Files = [
+                        filename:join(SrcPath, Name)
+                     || Name <- Names,
+                        lists:suffix(".app.src", Name),
+                        rebar3_reltree_fs:regular(
+                            filename:join(SrcPath, Name)
+                        )
+                    ],
                     app_identity_files(ProjectPath, Files);
                 {error, Reason} ->
                     {error, {app_src_directory_read, SrcPath, Reason}}
@@ -67,12 +73,15 @@ app_identity_files(_ProjectPath, [_One, _Two | _]) ->
     {error, multiple_app_src};
 app_identity_files(_ProjectPath, [Path]) ->
     case read_terms(Path) of
-        {ok, [{application, App, Properties}]} when is_atom(App),
-                                                    is_list(Properties) ->
+        {ok, [{application, App, Properties}]} when
+            is_atom(App),
+            is_list(Properties)
+        ->
             case app_version(Properties) of
                 {ok, Vsn} ->
                     {ok, #{app => App, app_vsn => Vsn, app_src => Path}};
-                {error, _} = Error -> Error
+                {error, _} = Error ->
+                    Error
             end;
         {ok, Terms} ->
             {error, {invalid_app_src_term, Terms}};
@@ -88,8 +97,10 @@ app_version(Properties) ->
                 true -> {ok, Vsn};
                 false -> {error, invalid_app_vsn}
             end;
-        [] -> {error, invalid_app_vsn};
-        _ -> {error, ambiguous_app_vsn}
+        [] ->
+            {error, invalid_app_vsn};
+        _ ->
+            {error, ambiguous_app_vsn}
     end.
 
 extract(Terms) ->
@@ -101,21 +112,31 @@ extract(Terms) ->
                         {ok, Plugins} ->
                             case dependency_list(Deps) of
                                 {ok, ValidDeps} ->
-                                    {ok, #{dependencies => ValidDeps,
-                                           project_plugins => ProjectPlugins,
-                                           plugins => Plugins}};
-                                {error, _} = Error -> Error
+                                    {ok, #{
+                                        dependencies => ValidDeps,
+                                        project_plugins => ProjectPlugins,
+                                        plugins => Plugins
+                                    }};
+                                {error, _} = Error ->
+                                    Error
                             end;
-                        {error, _} = Error -> Error
+                        {error, _} = Error ->
+                            Error
                     end;
-                {error, _} = Error -> Error
+                {error, _} = Error ->
+                    Error
             end;
-        {error, _} = Error -> Error
+        {error, _} = Error ->
+            Error
     end.
 
 fact_list(Key, Terms, Default) ->
-    Malformed = [Term || Term <- Terms, config_term_for(Key, Term),
-                         not valid_config_term(Term)],
+    Malformed = [
+        Term
+     || Term <- Terms,
+        config_term_for(Key, Term),
+        not valid_config_term(Term)
+    ],
     case Malformed of
         [Bad | _] ->
             {error, {malformed_config_term, Key, Bad}};
@@ -124,12 +145,17 @@ fact_list(Key, Terms, Default) ->
     end.
 
 fact_list_values(Key, Terms, Default) ->
-    Values = [Value || Term <- Terms,
-                       is_tuple(Term), tuple_size(Term) =:= 2,
-                       element(1, Term) =:= Key,
-                       Value <- [element(2, Term)]],
+    Values = [
+        Value
+     || Term <- Terms,
+        is_tuple(Term),
+        tuple_size(Term) =:= 2,
+        element(1, Term) =:= Key,
+        Value <- [element(2, Term)]
+    ],
     case Values of
-        [] -> {ok, Default};
+        [] ->
+            {ok, Default};
         _ ->
             Value = lists:last(Values),
             case is_list(Value) of
@@ -159,7 +185,12 @@ valid_dependency(Declaration) ->
     dependency_name(Declaration) =/= error.
 
 valid_string(Value) when is_list(Value), Value =/= [] ->
-    lists:all(fun(Char) -> is_integer(Char) andalso Char >= 0 andalso
-                              Char =< 16#10ffff end, Value);
+    lists:all(
+        fun(Char) ->
+            is_integer(Char) andalso Char >= 0 andalso
+                Char =< 16#10ffff
+        end,
+        Value
+    );
 valid_string(_Value) ->
     false.

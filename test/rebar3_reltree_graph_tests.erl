@@ -8,7 +8,9 @@ transitive_local_closure_and_external_declaration_test() ->
         A = project_dir(Workspace, "a"),
         B = project_dir(Workspace, "b"),
         C = project_dir(Workspace, "c"),
-        ok = file:make_dir(A), ok = file:make_dir(B), ok = file:make_dir(C),
+        ok = file:make_dir(A),
+        ok = file:make_dir(B),
+        ok = file:make_dir(C),
         rebar3_reltree_fixtures:write_project(A, a, [b, external], "0.1.0"),
         rebar3_reltree_fixtures:write_project(B, b, [c], "0.1.0"),
         rebar3_reltree_fixtures:write_project(C, c, [], "0.1.0"),
@@ -34,7 +36,9 @@ downstream_requires_declaration_and_matching_checkout_test() ->
         A = project_dir(Workspace, "a"),
         B = project_dir(Workspace, "b"),
         C = project_dir(Workspace, "c"),
-        ok = file:make_dir(A), ok = file:make_dir(B), ok = file:make_dir(C),
+        ok = file:make_dir(A),
+        ok = file:make_dir(B),
+        ok = file:make_dir(C),
         rebar3_reltree_fixtures:write_project(A, a, [], "0.1.0"),
         rebar3_reltree_fixtures:write_project(B, b, [a], "0.1.0"),
         rebar3_reltree_fixtures:write_project(C, c, [], "0.1.0"),
@@ -60,13 +64,20 @@ broken_checkout_is_insufficient_but_preserves_old_report_test() ->
         ok = file:make_symlink(filename:join(Workspace, "missing"), Broken),
         Request = rebar3_reltree_fixtures:request(A, [], default),
         {ok, Result} = rebar3_reltree_project:generate(
-                         Request, #{clock => fun() ->
-                                             {{2020, 1, 2}, {3, 4, 5}}
-                                         end}),
+            Request, #{
+                clock => fun() ->
+                    {{2020, 1, 2}, {3, 4, 5}}
+                end
+            }
+        ),
         ?assert(filelib:is_regular(maps:get(output_path, Request))),
         Report = maps:get(bytes, Result),
-        ?assert(string:str(binary_to_list(Report),
-                           "status: insufficient-local-data") > 0),
+        ?assert(
+            string:str(
+                binary_to_list(Report),
+                "status: insufficient-local-data"
+            ) > 0
+        ),
         ?assert(string:str(binary_to_list(Report), "checkout-invalid") > 0)
     after
         rebar3_reltree_fixtures:cleanup(Workspace)
@@ -78,14 +89,19 @@ checkout_only_and_external_declarations_do_not_create_edges_test() ->
         A = project_dir(Workspace, "a"),
         B = project_dir(Workspace, "b"),
         C = project_dir(Workspace, "c"),
-        ok = file:make_dir(A), ok = file:make_dir(B), ok = file:make_dir(C),
+        ok = file:make_dir(A),
+        ok = file:make_dir(B),
+        ok = file:make_dir(C),
         rebar3_reltree_fixtures:write_project(A, a, [external], "0.1.0"),
         rebar3_reltree_fixtures:write_project(B, b, [], "0.1.0"),
         rebar3_reltree_fixtures:write_project(C, c, [], "0.1.0"),
         rebar3_reltree_fixtures:checkout(A, b, B),
         rebar3_reltree_fixtures:checkout(C, a, A),
-        Request = rebar3_reltree_fixtures:request(A, [{Workspace, deep}],
-                                                  default),
+        Request = rebar3_reltree_fixtures:request(
+            A,
+            [{Workspace, deep}],
+            default
+        ),
         {ok, Graph} = rebar3_reltree_graph:build(Request),
         ?assertEqual([A], maps:get(included, Graph)),
         ?assertEqual([], maps:get(edges, Graph)),
@@ -104,7 +120,8 @@ explicit_checkout_outside_scan_catalog_is_loaded_test() ->
     try
         A = project_dir(Workspace, "a"),
         B = project_dir(Outside, "b"),
-        ok = file:make_dir(A), ok = file:make_dir(B),
+        ok = file:make_dir(A),
+        ok = file:make_dir(B),
         rebar3_reltree_fixtures:write_project(A, a, [b], "0.1.0"),
         rebar3_reltree_fixtures:write_project(B, b, [], "0.1.0"),
         rebar3_reltree_fixtures:checkout(A, b, B),
@@ -140,13 +157,18 @@ duplicate_dependency_declarations_share_one_canonical_edge_test() ->
     try
         A = project_dir(Workspace, "a"),
         B = project_dir(Workspace, "b"),
-        ok = file:make_dir(A), ok = file:make_dir(B),
+        ok = file:make_dir(A),
+        ok = file:make_dir(B),
         rebar3_reltree_fixtures:write_project(
-          A, a, [{b, "1.0"}, b, {b, git}], "0.1.0"),
+            A, a, [{b, "1.0"}, b, {b, git}], "0.1.0"
+        ),
         rebar3_reltree_fixtures:write_project(B, b, [], "0.1.0"),
         rebar3_reltree_fixtures:checkout(A, b, B),
-        Request = rebar3_reltree_fixtures:request(A, [{Workspace, deep}],
-                                                  default),
+        Request = rebar3_reltree_fixtures:request(
+            A,
+            [{Workspace, deep}],
+            default
+        ),
         {ok, Graph} = rebar3_reltree_graph:build(Request),
         ?assertEqual(1, length(maps:get(edges, Graph))),
         [Edge] = maps:get(edges, Graph),
@@ -166,21 +188,34 @@ malformed_unrelated_candidate_warns_without_changing_current_graph_test() ->
         Current = project_dir(Workspace, "current"),
         Good = project_dir(Workspace, "good"),
         Bad = project_dir(Workspace, "bad"),
-        ok = file:make_dir(Current), ok = file:make_dir(Good),
+        ok = file:make_dir(Current),
+        ok = file:make_dir(Good),
         ok = file:make_dir(Bad),
         rebar3_reltree_fixtures:write_project(Current, current, [], "0.1.0"),
         rebar3_reltree_fixtures:write_project(Good, good, [], "0.1.0"),
         rebar3_reltree_fixtures:write_file(
-          filename:join(Bad, "rebar.config"), "{deps, [} .\n"),
-        Request = rebar3_reltree_fixtures:request(Current,
-                                                  [{Workspace, deep}], default),
+            filename:join(Bad, "rebar.config"), "{deps, [} .\n"
+        ),
+        Request = rebar3_reltree_fixtures:request(
+            Current,
+            [{Workspace, deep}],
+            default
+        ),
         {ok, Graph} = rebar3_reltree_graph:build(Request),
-        ?assertEqual([rebar3_reltree_fs:canonical(Current)],
-                     maps:get(included, Graph)),
-        ?assert(lists:any(fun(W) -> maps:get(path, W) =:=
-                                      rebar3_reltree_fs:canonical(Bad) andalso
-                                      maps:get(reason, W) =:= candidate_invalid
-                          end, maps:get(warnings, Graph)))
+        ?assertEqual(
+            [rebar3_reltree_fs:canonical(Current)],
+            maps:get(included, Graph)
+        ),
+        ?assert(
+            lists:any(
+                fun(W) ->
+                    maps:get(path, W) =:=
+                        rebar3_reltree_fs:canonical(Bad) andalso
+                        maps:get(reason, W) =:= candidate_invalid
+                end,
+                maps:get(warnings, Graph)
+            )
+        )
     after
         rebar3_reltree_fixtures:cleanup(Workspace)
     end.
@@ -200,9 +235,12 @@ looping_checkout_is_an_insufficient_local_data_warning_test() ->
         ok = file:make_symlink(One, filename:join(CheckoutDir, "b")),
         Request = rebar3_reltree_fixtures:request(A, [], default),
         {ok, Result} = rebar3_reltree_project:generate(
-                         Request, #{clock => fun() ->
-                                             {{2020, 1, 2}, {3, 4, 5}}
-                                         end}),
+            Request, #{
+                clock => fun() ->
+                    {{2020, 1, 2}, {3, 4, 5}}
+                end
+            }
+        ),
         Text = binary_to_list(maps:get(bytes, Result)),
         ?assert(string:str(Text, "status: insufficient-local-data") > 0),
         ?assert(string:str(Text, "symlink_loop") > 0)
@@ -216,10 +254,12 @@ current_failure_preserves_existing_report_test() ->
         Current = project_dir(Workspace, "current"),
         ok = file:make_dir(Current),
         rebar3_reltree_fixtures:write_file(
-          filename:join(Current, "rebar.config"), "{deps, [} .\n"),
+            filename:join(Current, "rebar.config"), "{deps, [} .\n"
+        ),
         Request = rebar3_reltree_fixtures:request(Current, [], default),
         {ok, _} = rebar3_reltree_fs:atomic_write(
-                    maps:get(output_path, Request), <<"previous">>, #{}),
+            maps:get(output_path, Request), <<"previous">>, #{}
+        ),
         {error, {current_project, _, _}} =
             rebar3_reltree_project:generate(Request),
         {ok, Bytes} = file:read_file(maps:get(output_path, Request)),
@@ -233,10 +273,14 @@ project_dir(Workspace, Name) -> filename:join(Workspace, Name).
 
 report_bytes(Model) ->
     {ok, Bytes} = rebar3_reltree_report:render(
-                    Model, #{clock => fun() -> {{2020, 1, 2}, {3, 4, 5}} end}),
+        Model, #{clock => fun() -> {{2020, 1, 2}, {3, 4, 5}} end}
+    ),
     binary_to_list(Bytes).
 
 temp_files(Output) ->
     {ok, Names} = file:list_dir(filename:dirname(Output)),
-    [Name || Name <- Names,
-             lists:prefix(".project.md.reltree-", Name)].
+    [
+        Name
+     || Name <- Names,
+        lists:prefix(".project.md.reltree-", Name)
+    ].

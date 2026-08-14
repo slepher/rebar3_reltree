@@ -16,13 +16,15 @@ evaluate(AppVsn, Tags) ->
     Highest = highest_formal(SortedFormal),
     PreMismatch = prerelease_mismatch(ParsedApp, Prerelease),
     {Reason, Status} = evaluate_line(ParsedApp, Highest, PreMismatch),
-    #{app_vsn => AppVsn,
-      parsed_app_vsn => ParsedApp,
-      formal_tags => SortedFormal,
-      prerelease_tags => sort_prerelease(Prerelease),
-      highest_formal => Highest,
-      reason => Reason,
-      status => Status}.
+    #{
+        app_vsn => AppVsn,
+        parsed_app_vsn => ParsedApp,
+        formal_tags => SortedFormal,
+        prerelease_tags => sort_prerelease(Prerelease),
+        highest_formal => Highest,
+        reason => Reason,
+        status => Status
+    }.
 
 %% The version gate consumes the richer Git fact map used by the provider.
 %% `tags` remains accepted for the tree's existing fact shape; new callers
@@ -33,8 +35,11 @@ check(AppVsn, GitFacts) when is_map(GitFacts) ->
         error ->
             {error, {invalid_app_version, AppVsn}};
         {ok, ParsedApp} ->
-            ReachableTags = maps:get(reachable_tags, GitFacts,
-                                     maps:get(tags, GitFacts, [])),
+            ReachableTags = maps:get(
+                reachable_tags,
+                GitFacts,
+                maps:get(tags, GitFacts, [])
+            ),
             HeadTags = maps:get(head_tags, GitFacts, []),
             {Formal, Prerelease} = classify_tags(ReachableTags),
             {HeadFormal, HeadPrerelease} = classify_tags(HeadTags),
@@ -42,24 +47,29 @@ check(AppVsn, GitFacts) when is_map(GitFacts) ->
             SortedPrerelease = sort_prerelease(Prerelease),
             FormalVersions = group_formal(SortedFormal),
             Highest = highest_formal_version(FormalVersions),
-            CurrentTags = sort_formal(HeadFormal) ++
-                          sort_prerelease(HeadPrerelease),
+            CurrentTags =
+                sort_formal(HeadFormal) ++
+                    sort_prerelease(HeadPrerelease),
             case current_tag_mismatch(ParsedApp, CurrentTags) of
                 [] ->
                     case continuity(ParsedApp, Highest) of
                         invalid ->
-                            {error, {version_not_continuous,
-                                     #{app => ParsedApp,
-                                       highest_formal => Highest}}};
+                            {error,
+                                {version_not_continuous, #{
+                                    app => ParsedApp,
+                                    highest_formal => Highest
+                                }}};
                         Classification ->
-                            {ok, #{app_vsn => AppVsn,
-                                   parsed_app_vsn => ParsedApp,
-                                   formal_tags => SortedFormal,
-                                   formal_versions => FormalVersions,
-                                   prerelease_tags => SortedPrerelease,
-                                   head_tags => HeadTags,
-                                   highest_formal => Highest,
-                                   continuity => Classification}}
+                            {ok, #{
+                                app_vsn => AppVsn,
+                                parsed_app_vsn => ParsedApp,
+                                formal_tags => SortedFormal,
+                                formal_versions => FormalVersions,
+                                prerelease_tags => SortedPrerelease,
+                                head_tags => HeadTags,
+                                highest_formal => Highest,
+                                continuity => Classification
+                            }}
                     end;
                 Mismatches ->
                     {error, {current_tag_base_mismatch, Mismatches}}
@@ -68,8 +78,9 @@ check(AppVsn, GitFacts) when is_map(GitFacts) ->
 check(_AppVsn, _GitFacts) ->
     {error, invalid_git_facts}.
 
--spec parse_version(term()) -> {ok, {non_neg_integer(), non_neg_integer(),
-                                     non_neg_integer()}} | error.
+-spec parse_version(term()) ->
+    {ok, {non_neg_integer(), non_neg_integer(), non_neg_integer()}}
+    | error.
 parse_version(Value) when is_list(Value), Value =/= [] ->
     case string:split(Value, ".", all) of
         [A, B, C] ->
@@ -83,15 +94,19 @@ parse_version(Value) when is_list(Value), Value =/= [] ->
 parse_version(_Other) ->
     error.
 
--spec parse_tag(string()) -> none | {formal, tuple(), string()} |
-    {prerelease, tuple(), string()}.
+-spec parse_tag(string()) ->
+    none
+    | {formal, tuple(), string()}
+    | {prerelease, tuple(), string()}.
 parse_tag(Tag) when is_list(Tag), Tag =/= [] ->
-    WithoutV = case Tag of
-                  [$v | Rest] -> Rest;
-                  _ -> Tag
-              end,
+    WithoutV =
+        case Tag of
+            [$v | Rest] -> Rest;
+            _ -> Tag
+        end,
     case parse_version(WithoutV) of
-        {ok, Version} -> {formal, Version, Tag};
+        {ok, Version} ->
+            {formal, Version, Tag};
         error ->
             case string:split(WithoutV, "-", leading) of
                 [Base, Suffix] when Suffix =/= [] ->
@@ -101,7 +116,8 @@ parse_tag(Tag) when is_list(Tag), Tag =/= [] ->
                                 true -> {prerelease, Version, Tag};
                                 false -> none
                             end;
-                        error -> none
+                        error ->
+                            none
                     end;
                 _ ->
                     none
@@ -111,20 +127,31 @@ parse_tag(_Other) ->
     none.
 
 classify_tags(Tags) when is_list(Tags) ->
-    Parsed = [ParsedTag || Tag <- Tags,
-                           ParsedTag <- [parse_tag(Tag)],
-                           ParsedTag =/= none],
-    {[#{tag => Tag, version => Version} ||
-      {formal, Version, Tag} <- Parsed],
-     [#{tag => Tag, version => Version} ||
-      {prerelease, Version, Tag} <- Parsed]};
+    Parsed = [
+        ParsedTag
+     || Tag <- Tags,
+        ParsedTag <- [parse_tag(Tag)],
+        ParsedTag =/= none
+    ],
+    {
+        [
+            #{tag => Tag, version => Version}
+         || {formal, Version, Tag} <- Parsed
+        ],
+        [
+            #{tag => Tag, version => Version}
+         || {prerelease, Version, Tag} <- Parsed
+        ]
+    };
 classify_tags(_Other) ->
     {[], []}.
 
 valid_prerelease_suffix(Suffix) ->
     case string:split(Suffix, ".", all) of
-        [Kind, Serial] when (Kind =:= "rc" orelse Kind =:= "ci"),
-                            Serial =/= [] ->
+        [Kind, Serial] when
+            (Kind =:= "rc" orelse Kind =:= "ci"),
+            Serial =/= []
+        ->
             case integer_part(Serial) of
                 {ok, _} -> true;
                 error -> false
@@ -140,29 +167,46 @@ highest_formal(Formal) ->
     lists:last(sort_formal(Formal)).
 
 sort_formal(Formal) ->
-    lists:sort(fun(A, B) ->
-                       {maps:get(version, A), maps:get(tag, A)} =<
-                       {maps:get(version, B), maps:get(tag, B)}
-               end, Formal).
+    lists:sort(
+        fun(A, B) ->
+            {maps:get(version, A), maps:get(tag, A)} =<
+                {maps:get(version, B), maps:get(tag, B)}
+        end,
+        Formal
+    ).
 
 sort_prerelease(Prerelease) ->
-    lists:sort(fun(A, B) ->
-                       {maps:get(version, A), maps:get(tag, A)} =<
-                       {maps:get(version, B), maps:get(tag, B)}
-               end, Prerelease).
+    lists:sort(
+        fun(A, B) ->
+            {maps:get(version, A), maps:get(tag, A)} =<
+                {maps:get(version, B), maps:get(tag, B)}
+        end,
+        Prerelease
+    ).
 
 group_formal(Formal) ->
-    Groups = lists:foldl(fun(#{tag := Tag, version := Version}, Acc) ->
-                                 maps:update_with(
-                                   Version,
-                                   fun(Tags) -> [Tag | Tags] end,
-                                   [Tag], Acc)
-                         end, #{}, Formal),
-    lists:sort(fun(A, B) -> maps:get(version, A) =< maps:get(version, B)
-               end,
-               [#{version => Version,
-                  tags => lists:sort(lists:usort(Tags))} ||
-                {Version, Tags} <- maps:to_list(Groups)]).
+    Groups = lists:foldl(
+        fun(#{tag := Tag, version := Version}, Acc) ->
+            maps:update_with(
+                Version,
+                fun(Tags) -> [Tag | Tags] end,
+                [Tag],
+                Acc
+            )
+        end,
+        #{},
+        Formal
+    ),
+    lists:sort(
+        fun(A, B) -> maps:get(version, A) =< maps:get(version, B) end,
+        [
+            #{
+                version => Version,
+                tags => lists:sort(lists:usort(Tags))
+            }
+         || {Version, Tags} <- maps:to_list(Groups)
+        ]
+    ).
 
 highest_formal_version([]) ->
     none;
@@ -170,8 +214,10 @@ highest_formal_version(FormalVersions) ->
     lists:last(FormalVersions).
 
 current_tag_mismatch(App, Tags) ->
-    [#{tag => maps:get(tag, Tag), version => maps:get(version, Tag)} ||
-     Tag <- Tags, maps:get(version, Tag) =/= App].
+    [
+        #{tag => maps:get(tag, Tag), version => maps:get(version, Tag)}
+     || Tag <- Tags, maps:get(version, Tag) =/= App
+    ].
 
 continuity(_App, none) ->
     initial;
@@ -216,7 +262,8 @@ integer_part([]) ->
 integer_part(Value) ->
     case lists:all(fun(Char) -> Char >= $0 andalso Char =< $9 end, Value) of
         true ->
-            try {ok, list_to_integer(Value)}
+            try
+                {ok, list_to_integer(Value)}
             catch
                 error:badarg -> error
             end;

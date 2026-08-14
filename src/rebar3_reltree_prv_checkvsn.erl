@@ -49,8 +49,11 @@ run(State) ->
         {ok, App} ->
             case rebar3_reltree_git:read(Root) of
                 {ok, GitFacts} ->
-                    case rebar3_reltree_version:check(
-                           maps:get(app_vsn, App), GitFacts) of
+                    case
+                        rebar3_reltree_version:check(
+                            maps:get(app_vsn, App), GitFacts
+                        )
+                    of
                         {ok, _Facts} ->
                             io:put_chars("reltree checkvsn: passed\n"),
                             {ok, State};
@@ -68,8 +71,10 @@ provider_error(Reason) ->
     {error, {?MODULE, Reason}}.
 
 help() ->
-    ["Usage: rebar3 reltree checkvsn\n",
-     "Check local app.src version and reachable tag continuity.\n"].
+    [
+        "Usage: rebar3 reltree checkvsn\n",
+        "Check local app.src version and reachable tag continuity.\n"
+    ].
 
 reason_text(no_app_src) ->
     "no app.src file found";
@@ -84,8 +89,10 @@ reason_text({invalid_app_version, AppVsn}) ->
 reason_text({current_tag_base_mismatch, Tags}) ->
     ["current tag base does not match app version: ", bounded_term(Tags)];
 reason_text({version_not_continuous, Facts}) ->
-    ["version is not continuous from highest formal tag: ",
-     bounded_term(Facts)];
+    [
+        "version is not continuous from highest formal tag: ",
+        bounded_term(Facts)
+    ];
 reason_text({git_head, Reason}) ->
     ["unable to read Git HEAD (", git_reason_text(Reason), ")"];
 reason_text({git_tags, Reason}) ->
